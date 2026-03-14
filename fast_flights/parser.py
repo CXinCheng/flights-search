@@ -52,10 +52,10 @@ def parse_js(js: str):
     meta = JsMetadata(alliances=alliances, airlines=airlines)
 
     flights = MetaList()
-    if payload[3][0] is None:
+    if payload[2][0] is None:
         return flights
 
-    for k in payload[3][0]:
+    for k in payload[2][0]:
         flight = k[0]
         price = k[1][0][1]
 
@@ -79,6 +79,15 @@ def parse_js(js: str):
             plane_type = single_flight[17]
 
             duration = single_flight[11]
+            raw_flight_number = single_flight[22]
+            flight_number = None
+            if (
+                isinstance(raw_flight_number, list)
+                and len(raw_flight_number) >= 2
+                and raw_flight_number[0]
+                and raw_flight_number[1]
+            ):
+                flight_number = f"{raw_flight_number[0]}{raw_flight_number[1]}"
 
             sg_flights.append(
                 SingleFlight(
@@ -88,6 +97,7 @@ def parse_js(js: str):
                     arrival=arrival,
                     duration=duration,
                     plane_type=plane_type,
+                    flight_number=flight_number,
                 )
             )
 
