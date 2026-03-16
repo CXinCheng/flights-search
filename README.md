@@ -1,3 +1,168 @@
+﻿# fast-flights Integration Guide
+
+This project uses `fast_flights` to query Google Flights-style results in Python.
+
+## Install
+
+```bash
+pip install fast-flights
+```
+
+## Core API
+
+```python
+from fast_flights import FlightQuery, Passengers, create_query, get_flights
+```
+
+- `create_query(...)` builds the request.
+- `get_flights(query)` fetches and parses results.
+- Each result item includes fields like `price`, `airlines`, `flights`, and `tfu_token`.
+
+## One-way Example
+
+```python
+from fast_flights import FlightQuery, Passengers, create_query, get_flights
+
+query = create_query(
+    flights=[
+        FlightQuery(
+            date="2026-04-01",
+            from_airport="CAN",
+            to_airport="SGN",
+        )
+    ],
+    seat="economy",
+    trip="one-way",
+    passengers=Passengers(adults=1),
+    language="en-US",
+    currency="SGD",
+)
+
+results = get_flights(query)
+
+for i, option in enumerate(results, start=1):
+    first_leg = option.flights[0]
+    print(
+        i,
+        option.price,
+        option.airlines,
+        first_leg.from_airport.code,
+        "->",
+        first_leg.to_airport.code,
+        first_leg.flight_number,
+    )
+```
+
+## Round-trip Example (2-step token flow)
+
+For round-trip, use two calls:
+
+1. Call once to get outbound options and collect:
+- `tfu_token`
+- outbound airline code (`flight_number_airline_code`)
+- outbound flight number (`flight_number_numeric`)
+
+2. Call again with those values to get return options tied to the selected outbound.
+
+```python
+from fast_flights import FlightQuery, Passengers, create_query, get_flights
+
+flights = [
+    FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN"),
+    FlightQuery(date="2026-04-05", from_airport="SGN", to_airport="CAN"),
+]
+
+# Step 1: outbound options
+step1_query = create_query(
+    flights=flights,
+    seat="economy",
+    trip="round-trip",
+    passengers=Passengers(adults=1),
+    language="en-US",
+    currency="SGD",
+)
+step1_results = get_flights(step1_query)
+
+selected = step1_results[0]  # choose one option by your own logic
+selected_first_leg = selected.flights[0]
+selected_token = selected.tfu_token
+selected_outbound_airline_code = selected_first_leg.flight_number_airline_code
+selected_outbound_flight_number = selected_first_leg.flight_number_numeric
+
+# Step 2: return options for the selected outbound
+step2_query = create_query(
+    flights=flights,
+    seat="economy",
+    trip="round-trip",
+    passengers=Passengers(adults=1),
+    language="en-US",
+    currency="SGD",
+    tfu=selected_token,
+    selected_outbound_airline_code=selected_outbound_airline_code,
+    selected_outbound_flight_number=selected_outbound_flight_number,
+)
+step2_results = get_flights(step2_query)
+
+for i, option in enumerate(step2_results, start=1):
+    first_leg = option.flights[0]
+    print(
+        i,
+        option.price,
+        option.airlines,
+        first_leg.from_airport.code,
+        "->",
+        first_leg.to_airport.code,
+        first_leg.flight_number,
+    )
+```
+
+## Example Response
+
+Below is a representative structure round-trip example outputs:
+
+Step 1:
+
+```python
+[
+    Flights(
+        type="one-way",
+        price=280,
+        airlines=["Spring"],
+        tfu_token="CjRIenBRTEllQUs4WEVBQm1WOGdCRy0tLS0tLS0tLXNtaHQxMEFBQUFBR20zeDA0TVFzaFNBEgY5QzczNDcaCwif2gEQAhoDU0dEOB1woaoB",
+        flights=[
+            SingleFlight(
+                from_airport=Airport(code="CAN", name="Guangzhou"),
+                to_airport=Airport(code="SGN", name="Ho Chi Minh City"),
+                departure=SimpleDatetime(date=(2026, 4, 1), time=(16, 5)),
+                arrival=SimpleDatetime(date=(2026, 4, 1), time=(17, 55)),
+                duration=170,
+                plane_type="Airbus A320",
+                flight_number="9C7347",
+                flight_number_airline_code="9C",
+                flight_number_numeric="7347",
+            )
+        ],
+    )
+]
+```
+
+Step 2 (round-trip return lookup with selected token) can return entries like:
+
+```text
+price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348
+```
+
+## Notes
+
+- Airport values are IATA codes (for example: `CAN`, `SGN`).
+- Dates use `YYYY-MM-DD`.
+- `step1_results` can contain multiple outbound options; your app should decide which one to select before step 2.
+
+
+---
+
+## Original README Content
+
 <div align="center">
 
 # ✈️ fast-flights (v3.0rc1)
