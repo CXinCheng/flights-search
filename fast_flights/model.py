@@ -41,6 +41,9 @@ class SingleFlight:
     duration: Annotated[int, "(minutes)"]
     plane_type: str
     flight_number: str | None
+    flight_number_airline_code: str | None
+    flight_number_numeric: str | None
+    flight_number_airline_name: str | None = None
 
 
 @dataclass
@@ -56,3 +59,4 @@ class Flights:
     airlines: list[str]
     flights: list[SingleFlight]
     carbon: CarbonEmission
+    tfu_token: str | None = None

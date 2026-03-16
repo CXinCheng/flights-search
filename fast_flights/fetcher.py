@@ -58,7 +58,8 @@ def get_flights(
         proxy (str, optional): Proxy.
     """
     html = fetch_flights_html(q, proxy=proxy, integration=integration)
-    return parse(html)
+    use_payload3 = isinstance(q, Query) and bool(q.tfu)
+    return parse(html, use_payload3=use_payload3)
 
 
 def fetch_flights_html(

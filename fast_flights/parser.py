@@ -20,19 +20,26 @@ class MetaList(list[Flights]):
     metadata: JsMetadata
 
 
-def parse(html: str) -> MetaList:
+def _get_rows(payload: list, *, use_payload3: bool) -> list:
+    if use_payload3:
+        rows = payload[3][0]
+        return rows
+
+    rows = payload[2][0]
+    return rows if rows is not None else []
+
+
+def parse(html: str, *, use_payload3: bool = False) -> MetaList:
     parser = LexborHTMLParser(html)
 
     # find js
     script = parser.css_first(r"script.ds\:1")
-    return parse_js(script.text())
+    return parse_js(script.text(), use_payload3=use_payload3)
 
 
 # Data discovery by @kftang, huge shout out!
-def parse_js(js: str):
+def parse_js(js: str, *, use_payload3: bool = False):
     data = js.split("data:", 1)[1].rsplit(",", 1)[0]
-    print(data)
-
     payload = json.loads(data)
 
     alliances = []
@@ -52,12 +59,15 @@ def parse_js(js: str):
     meta = JsMetadata(alliances=alliances, airlines=airlines)
 
     flights = MetaList()
-    if payload[2][0] is None:
+    rows = _get_rows(payload, use_payload3=use_payload3)
+    if not rows:
+        flights.metadata = meta
         return flights
 
-    for k in payload[2][0]:
+    for k in rows:
         flight = k[0]
         price = k[1][0][1]
+        tfu_token = k[1][1] if isinstance(k[1], list) and len(k[1]) > 1 else None
 
         typ = flight[0]
         airlines = flight[1]
@@ -81,13 +91,20 @@ def parse_js(js: str):
             duration = single_flight[11]
             raw_flight_number = single_flight[22]
             flight_number = None
+            flight_number_airline_code = None
+            flight_number_numeric = None
+            flight_number_airline_name = None
             if (
                 isinstance(raw_flight_number, list)
                 and len(raw_flight_number) >= 2
                 and raw_flight_number[0]
                 and raw_flight_number[1]
             ):
-                flight_number = f"{raw_flight_number[0]}{raw_flight_number[1]}"
+                flight_number_airline_code = raw_flight_number[0]
+                flight_number_numeric = raw_flight_number[1]
+                flight_number = f"{flight_number_airline_code}{flight_number_numeric}"
+                if len(raw_flight_number) >= 4 and raw_flight_number[3]:
+                    flight_number_airline_name = raw_flight_number[3]
 
             sg_flights.append(
                 SingleFlight(
@@ -98,6 +115,9 @@ def parse_js(js: str):
                     duration=duration,
                     plane_type=plane_type,
                     flight_number=flight_number,
+                    flight_number_airline_code=flight_number_airline_code,
+                    flight_number_numeric=flight_number_numeric,
+                    flight_number_airline_name=flight_number_airline_name,
                 )
             )
 
@@ -115,6 +135,7 @@ def parse_js(js: str):
                 carbon=CarbonEmission(
                     typical_on_route=typical_carbon_emission, emission=carbon_emission
                 ),
+                tfu_token=tfu_token,
             )
         )
 
