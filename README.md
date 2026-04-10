@@ -16,7 +16,7 @@ from fast_flights import FlightQuery, Passengers, create_query, get_flights
 
 - `create_query(...)` builds the request.
 - `get_flights(query)` fetches and parses results.
-- Each result item includes fields like `price`, `airlines`, `flights`, and `tfu_token`.
+- Each result item includes fields like `price`, `airlines`, `flights`, `tfu_token`, and `booking_url`.
 
 ## One-way Example
 
@@ -38,7 +38,7 @@ query = create_query(
     currency="SGD",
 )
 
-results = get_flights(query)
+results = get_flights(query, include_booking_urls=True)
 
 for i, option in enumerate(results, start=1):
     first_leg = option.flights[0]
@@ -50,6 +50,7 @@ for i, option in enumerate(results, start=1):
         "->",
         first_leg.to_airport.code,
         first_leg.flight_number,
+        option.booking_url,
     )
 ```
 
@@ -101,7 +102,7 @@ step2_query = create_query(
     selected_outbound_airline_code=selected_outbound_airline_code,
     selected_outbound_flight_number=selected_outbound_flight_number,
 )
-step2_results = get_flights(step2_query)
+step2_results = get_flights(step2_query, include_booking_urls=True)
 
 for i, option in enumerate(step2_results, start=1):
     first_leg = option.flights[0]
@@ -113,6 +114,7 @@ for i, option in enumerate(step2_results, start=1):
         "->",
         first_leg.to_airport.code,
         first_leg.flight_number,
+        option.booking_url,
     )
 ```
 
@@ -149,7 +151,7 @@ Step 1:
 Step 2 (round-trip return lookup with selected token) can return entries like:
 
 ```text
-price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348
+price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348, booking_url=https://www.google.com/travel/clk/f?u=...
 ```
 
 ## Notes
@@ -157,6 +159,8 @@ price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348
 - Airport values are IATA codes (for example: `CAN`, `SGN`).
 - Dates use `YYYY-MM-DD`.
 - `step1_results` can contain multiple outbound options; your app should decide which one to select before step 2.
+- `booking_url` is available for one-way calls when you pass `include_booking_urls=True`.
+- For round-trip flows, `booking_url` is only populated on the second call with `tfu=...`.
 
 
 ---

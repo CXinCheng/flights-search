@@ -1,0 +1,281 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlencode
+
+from playwright.async_api import BrowserContext, Page, Response, async_playwright
+
+from .querying import Query
+
+BOOKING_RESULTS_URL_PART = (
+    "/_/FlightsFrontendUi/data/travel.frontend.flights.FlightsFrontendService/"
+    "GetBookingResults"
+)
+DEFAULT_OUTPUT_DIR = Path("captures") / "booking_results"
+BOOKING_LINK_BASE = "https://www.google.com/travel/clk/f"
+BOOKING_LINK_PATTERN = re.compile(
+    r'https://www\.google\.com/travel/clk/f\\?",\[\[\\?"u\\?",\\?"([^"\\]+)',
+)
+
+
+@dataclass
+class CapturedBookingResponse:
+    captured_at: str
+    page_url: str
+    response_url: str
+    status: int
+    ok: bool
+    method: str
+    resource_type: str
+    request_headers: dict[str, str]
+    response_headers: dict[str, str]
+    post_data: str | None
+    response_text: str
+    booking_links: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+def _ensure_dir(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _extract_booking_links(response_text: str) -> list[str]:
+    links: list[str] = []
+    seen: set[str] = set()
+
+    for token in BOOKING_LINK_PATTERN.findall(response_text):
+        link = f"{BOOKING_LINK_BASE}?{urlencode({'u': token})}"
+        if link not in seen:
+            seen.add(link)
+            links.append(link)
+
+    return links
+
+
+async def _capture_response(response: Response, page: Page) -> CapturedBookingResponse:
+    request = response.request
+    post_data = request.post_data
+    response_text = await response.text()
+
+    return CapturedBookingResponse(
+        captured_at=datetime.now(timezone.utc).isoformat(),
+        page_url=page.url,
+        response_url=response.url,
+        status=response.status,
+        ok=response.ok,
+        method=request.method,
+        resource_type=request.resource_type,
+        request_headers=await request.all_headers(),
+        response_headers=await response.all_headers(),
+        post_data=post_data,
+        response_text=response_text,
+        booking_links=_extract_booking_links(response_text),
+    )
+
+
+def _write_capture(output_dir: Path, capture: CapturedBookingResponse) -> Path:
+    output_path = _ensure_dir(output_dir) / f"{_timestamp()}.json"
+    output_path.write_text(
+        json.dumps(capture.to_dict(), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return output_path
+
+
+async def capture_booking_results(
+    *,
+    url: str,
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+    headless: bool = False,
+    timeout_ms: int = 300000,
+    max_matches: int | None = None,
+) -> list[Path]:
+    output_dir = Path(output_dir)
+    saved_paths: list[Path] = []
+    done = asyncio.Event()
+    pending_tasks: set[asyncio.Task[None]] = set()
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=headless)
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        async def handle_response(response: Response) -> None:
+            if BOOKING_RESULTS_URL_PART not in response.url:
+                return
+
+            capture = await _capture_response(response, page)
+            saved_path = _write_capture(output_dir, capture)
+            saved_paths.append(saved_path)
+            print(
+                f"[capture {len(saved_paths)}] status={capture.status} "
+                f"url={capture.response_url}"
+            )
+            for booking_link in capture.booking_links:
+                print(f"[booking_link] {booking_link}")
+            print(f"[saved] {saved_path}")
+
+            if max_matches is not None and len(saved_paths) >= max_matches:
+                done.set()
+
+        def schedule_response_capture(response: Response) -> None:
+            task = asyncio.create_task(handle_response(response))
+            pending_tasks.add(task)
+            task.add_done_callback(pending_tasks.discard)
+
+        page.on("response", schedule_response_capture)
+        await page.goto(url, wait_until="domcontentloaded")
+
+        if max_matches is None:
+            try:
+                await asyncio.wait_for(done.wait(), timeout=timeout_ms / 1000)
+            except TimeoutError:
+                pass
+        else:
+            await asyncio.wait_for(done.wait(), timeout=timeout_ms / 1000)
+
+        if pending_tasks:
+            await asyncio.gather(*pending_tasks, return_exceptions=True)
+        await context.close()
+        await browser.close()
+
+    return saved_paths
+
+
+async def fetch_booking_links(
+    *,
+    url: str,
+    headless: bool = True,
+    timeout_ms: int = 300000,
+) -> list[str]:
+    links: list[str] = []
+    seen: set[str] = set()
+    done = asyncio.Event()
+    pending_tasks: set[asyncio.Task[None]] = set()
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=headless)
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        async def handle_response(response: Response) -> None:
+            if BOOKING_RESULTS_URL_PART not in response.url:
+                return
+
+            response_links = _extract_booking_links(await response.text())
+            for link in response_links:
+                if link not in seen:
+                    seen.add(link)
+                    links.append(link)
+            done.set()
+
+        def schedule_response_capture(response: Response) -> None:
+            task = asyncio.create_task(handle_response(response))
+            pending_tasks.add(task)
+            task.add_done_callback(pending_tasks.discard)
+
+        page.on("response", schedule_response_capture)
+        await page.goto(url, wait_until="domcontentloaded")
+        await asyncio.wait_for(done.wait(), timeout=timeout_ms / 1000)
+
+        if pending_tasks:
+            await asyncio.gather(*pending_tasks, return_exceptions=True)
+        await context.close()
+        await browser.close()
+
+    return links
+
+
+async def fetch_booking_links_for_query(
+    query: Query,
+    *,
+    headless: bool = True,
+    timeout_ms: int = 300000,
+) -> list[str]:
+    return await fetch_booking_links(
+        url=query.booking_url(),
+        headless=headless,
+        timeout_ms=timeout_ms,
+    )
+
+
+async def capture_booking_results_for_query(
+    query: Query,
+    *,
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+    headless: bool = False,
+    timeout_ms: int = 300000,
+    max_matches: int | None = None,
+) -> list[Path]:
+    return await capture_booking_results(
+        url=query.url(),
+        output_dir=output_dir,
+        headless=headless,
+        timeout_ms=timeout_ms,
+        max_matches=max_matches,
+    )
+
+
+async def keep_browser_open_and_capture(
+    *,
+    start_url: str = "https://www.google.com/travel/flights",
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+    headless: bool = False,
+) -> None:
+    output_dir = Path(output_dir)
+    pending_tasks: set[asyncio.Task[None]] = set()
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=headless)
+        context: BrowserContext = await browser.new_context()
+        page = await context.new_page()
+
+        async def handle_response(response: Response) -> None:
+            if BOOKING_RESULTS_URL_PART not in response.url:
+                return
+
+            capture = await _capture_response(response, page)
+            saved_path = _write_capture(output_dir, capture)
+            print(
+                f"[capture] status={capture.status} url={capture.response_url}\n"
+                + "\n".join(
+                    f"[booking_link] {booking_link}"
+                    for booking_link in capture.booking_links
+                )
+                + ("\n" if capture.booking_links else "")
+                + f"[saved] {saved_path}"
+            )
+
+        def schedule_response_capture(response: Response) -> None:
+            task = asyncio.create_task(handle_response(response))
+            pending_tasks.add(task)
+            task.add_done_callback(pending_tasks.discard)
+
+        page.on("response", schedule_response_capture)
+        await page.goto(start_url, wait_until="domcontentloaded")
+        print(
+            "Browser is open. Trigger booking options in Google Flights; "
+            "matching responses will be written to disk. Press Ctrl+C to stop."
+        )
+
+        try:
+            while True:
+                await asyncio.sleep(1)
+        finally:
+            if pending_tasks:
+                await asyncio.gather(*pending_tasks, return_exceptions=True)
+            await context.close()
+            await browser.close()

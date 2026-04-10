@@ -6,7 +6,7 @@ from datetime import datetime
 from fast_flights.fetcher import get_flights
 from fast_flights.integrations.base import Integration
 from fast_flights.parser import parse_js
-from fast_flights.querying import FlightQuery, Passengers, create_query
+from fast_flights.querying import FlightQuery, Passengers, Query, create_query
 
 
 def _single_flight(
@@ -97,11 +97,20 @@ class StubIntegration(Integration):
     def __init__(self, first_html: str, second_html: str):
         self.first_html = first_html
         self.second_html = second_html
+        self.booking_link_calls: list[Query] = []
 
     def fetch_html(self, q, /) -> str:
         if hasattr(q, "tfu") and q.tfu:
             return self.second_html
         return self.first_html
+
+    def fetch_booking_links(self, q, results, /) -> list[str] | None:
+        self.booking_link_calls.append(q)
+        if q.tfu:
+            return ["https://www.google.com/travel/clk/f?u=RETURN"]
+        if len(q.flight_data) == 1:
+            return ["https://www.google.com/travel/clk/f?u=ONEWAY"]
+        return []
 
 
 class RoundTripTokenTests(unittest.TestCase):
@@ -300,6 +309,138 @@ class RoundTripTokenTests(unittest.TestCase):
         return_results = get_flights(return_query, integration=integration)
         self.assertEqual(len(return_results), 1)
         self.assertEqual(return_results[0].flights[0].flight_number, "9C7348")
+
+    def test_one_way_booking_url_can_be_enriched(self):
+        payload = _base_payload()
+        payload[2][0] = [
+            _flight_row(
+                from_code="CAN",
+                from_name="Guangzhou Baiyun International Airport",
+                to_code="SGN",
+                to_name="Tan Son Nhat International Airport",
+                dep_date=(2026, 4, 1),
+                arr_date=(2026, 4, 1),
+                dep_time=(16, 5),
+                arr_time=(17, 55),
+                flight_number=("9C", "7347"),
+                price=280,
+                token=None,
+            )
+        ]
+
+        integration = StubIntegration(
+            first_html=_payload_html(payload),
+            second_html=_payload_html(payload),
+        )
+
+        query = create_query(
+            flights=[FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN")],
+            seat="economy",
+            trip="one-way",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+        )
+        results = get_flights(
+            query,
+            integration=integration,
+            include_booking_urls=True,
+        )
+
+        self.assertEqual(
+            results[0].booking_url,
+            "https://www.google.com/travel/clk/f?u=ONEWAY",
+        )
+
+    def test_round_trip_booking_url_is_only_added_on_second_call(self):
+        first_payload = _base_payload()
+        first_payload[2][0] = [
+            _flight_row(
+                from_code="CAN",
+                from_name="Guangzhou Baiyun International Airport",
+                to_code="SGN",
+                to_name="Tan Son Nhat International Airport",
+                dep_date=(2026, 4, 1),
+                arr_date=(2026, 4, 1),
+                dep_time=(16, 5),
+                arr_time=(17, 55),
+                flight_number=("9C", "7347"),
+                price=280,
+                token="SELECTED-OUTBOUND",
+            )
+        ]
+
+        second_payload = _base_payload()
+        second_payload[2][0] = None
+        second_payload[3][0] = [
+            [
+                [
+                    _flight_row(
+                        from_code="SGN",
+                        from_name="Tan Son Nhat International Airport",
+                        to_code="CAN",
+                        to_name="Guangzhou Baiyun International Airport",
+                        dep_date=(2026, 4, 5),
+                        arr_date=(2026, 4, 5),
+                        dep_time=(18, 55),
+                        arr_time=(23, 15),
+                        flight_number=("9C", "7348"),
+                        price=280,
+                        token="RETURN-TOKEN",
+                    )
+                ],
+                0,
+                0,
+                0,
+                [1],
+            ]
+        ]
+
+        integration = StubIntegration(
+            first_html=_payload_html(first_payload),
+            second_html=_payload_html(second_payload),
+        )
+
+        outbound_query = create_query(
+            flights=[
+                FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN"),
+                FlightQuery(date="2026-04-05", from_airport="SGN", to_airport="CAN"),
+            ],
+            seat="economy",
+            trip="round-trip",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+        )
+        outbound_results = get_flights(
+            outbound_query,
+            integration=integration,
+            include_booking_urls=True,
+        )
+        self.assertIsNone(outbound_results[0].booking_url)
+
+        return_query = create_query(
+            flights=[
+                FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN"),
+                FlightQuery(date="2026-04-05", from_airport="SGN", to_airport="CAN"),
+            ],
+            seat="economy",
+            trip="round-trip",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+            tfu=outbound_results[0].tfu_token,
+        )
+        return_results = get_flights(
+            return_query,
+            integration=integration,
+            include_booking_urls=True,
+        )
+        self.assertEqual(
+            return_results[0].booking_url,
+            "https://www.google.com/travel/clk/f?u=RETURN",
+        )
+        self.assertEqual(len(integration.booking_link_calls), 1)
 
 
 if __name__ == "__main__":

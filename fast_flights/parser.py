@@ -65,6 +65,16 @@ def parse_js(js: str, *, use_payload3: bool = False):
         return flights
 
     for k in rows:
+        if (
+            use_payload3
+            and isinstance(k, list)
+            and k
+            and isinstance(k[0], list)
+            and len(k[0]) == 1
+            and isinstance(k[0][0], list)
+        ):
+            k = k[0][0]
+
         flight = k[0]
         price = k[1][0][1]
         tfu_token = k[1][1] if isinstance(k[1], list) and len(k[1]) > 1 else None

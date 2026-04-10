@@ -1,6 +1,7 @@
 from base64 import b64encode
 from dataclasses import dataclass
 from datetime import datetime as Datetime
+from urllib.parse import urlencode
 from typing import Literal, Optional, Union
 
 from .pb.flights_pb2 import Airport, FlightData, Info, Passenger, Seat, Trip
@@ -158,6 +159,12 @@ class Query:
         if self.tfu:
             url += "&tfu=" + self.tfu
         return url
+
+    def booking_url(self) -> str:
+        """Get the Google Flights booking page URL for this query."""
+        return "https://www.google.com/travel/flights/booking?" + urlencode(
+            self.params()
+        )
 
     def params(self) -> dict[str, str]:
         """Create `params` in dictionary form."""

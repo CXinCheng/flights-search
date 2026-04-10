@@ -1,8 +1,10 @@
+import asyncio
 from typing import overload
 
 from primp import Client
 
 from .integrations.base import Integration
+from .pb.flights_pb2 import Trip
 from .parser import MetaList, parse
 from .querying import Query
 
@@ -10,7 +12,15 @@ URL = "https://www.google.com/travel/flights"
 
 
 @overload
-def get_flights(q: str, /, *, proxy: str | None = None) -> MetaList:
+def get_flights(
+    q: str,
+    /,
+    *,
+    proxy: str | None = None,
+    include_booking_urls: bool = False,
+    booking_headless: bool = True,
+    booking_timeout_ms: int = 300000,
+) -> MetaList:
     """Get flights using a str query.
 
     Examples:
@@ -19,7 +29,15 @@ def get_flights(q: str, /, *, proxy: str | None = None) -> MetaList:
 
 
 @overload
-def get_flights(q: Query, /, *, proxy: str | None = None) -> MetaList:
+def get_flights(
+    q: Query,
+    /,
+    *,
+    proxy: str | None = None,
+    include_booking_urls: bool = False,
+    booking_headless: bool = True,
+    booking_timeout_ms: int = 300000,
+) -> MetaList:
     """Get flights using a structured query.
 
     Example:
@@ -50,6 +68,9 @@ def get_flights(
     *,
     proxy: str | None = None,
     integration: Integration | None = None,
+    include_booking_urls: bool = False,
+    booking_headless: bool = True,
+    booking_timeout_ms: int = 300000,
 ) -> MetaList:
     """Get flights.
 
@@ -59,7 +80,18 @@ def get_flights(
     """
     html = fetch_flights_html(q, proxy=proxy, integration=integration)
     use_payload3 = isinstance(q, Query) and bool(q.tfu)
-    return parse(html, use_payload3=use_payload3)
+    results = parse(html, use_payload3=use_payload3)
+
+    if include_booking_urls:
+        _attach_booking_urls(
+            results,
+            q,
+            integration=integration,
+            booking_headless=booking_headless,
+            booking_timeout_ms=booking_timeout_ms,
+        )
+
+    return results
 
 
 def fetch_flights_html(
@@ -95,3 +127,38 @@ def fetch_flights_html(
 
     else:
         return integration.fetch_html(q)
+
+
+def _attach_booking_urls(
+    results: MetaList,
+    q: Query | str,
+    *,
+    integration: Integration | None,
+    booking_headless: bool,
+    booking_timeout_ms: int,
+) -> None:
+    if not results or not isinstance(q, Query):
+        return
+
+    # Round-trip booking URLs are only valid for the second-step follow-up call.
+    if q.trip == Trip.ROUND_TRIP and not q.tfu:
+        return
+
+    booking_links: list[str] | None = None
+
+    if integration is not None:
+        booking_links = integration.fetch_booking_links(q, list(results))
+
+    if booking_links is None:
+        from .browser_capture import fetch_booking_links_for_query
+
+        booking_links = asyncio.run(
+            fetch_booking_links_for_query(
+                q,
+                headless=booking_headless,
+                timeout_ms=booking_timeout_ms,
+            )
+        )
+
+    for result, booking_link in zip(results, booking_links):
+        result.booking_url = booking_link
