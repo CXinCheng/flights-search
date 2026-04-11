@@ -2,7 +2,9 @@ import json
 import unittest
 from base64 import b64decode
 from datetime import datetime
+from unittest.mock import patch
 
+from fast_flights.browser_capture import _extract_first_booking_link
 from fast_flights.fetcher import get_flights
 from fast_flights.integrations.base import Integration
 from fast_flights.parser import parse_js
@@ -113,7 +115,27 @@ class StubIntegration(Integration):
         return []
 
 
+class HtmlOnlyIntegration(Integration):
+    def __init__(self, html: str):
+        self.html = html
+
+    def fetch_html(self, q, /) -> str:
+        return self.html
+
+
 class RoundTripTokenTests(unittest.TestCase):
+    def test_extract_first_booking_link_prefers_first_match(self):
+        payload = (
+            'https://www.google.com/travel/clk/f\\",[[\\"u\\",\\"FIRST\\"]]'
+            ' some filler '
+            'https://www.google.com/travel/clk/f\\",[[\\"u\\",\\"SECOND\\"]]'
+        )
+
+        self.assertEqual(
+            _extract_first_booking_link(payload),
+            "https://www.google.com/travel/clk/f?u=FIRST",
+        )
+
     def test_query_params_without_and_with_tfu(self):
         without_tfu = create_query(
             flights=[FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN")],
@@ -441,6 +463,54 @@ class RoundTripTokenTests(unittest.TestCase):
             "https://www.google.com/travel/clk/f?u=RETURN",
         )
         self.assertEqual(len(integration.booking_link_calls), 1)
+
+    def test_playwright_fallback_only_uses_first_booking_link(self):
+        payload = _base_payload()
+        payload[2][0] = [
+            _flight_row(
+                from_code="CAN",
+                from_name="Guangzhou Baiyun International Airport",
+                to_code="SGN",
+                to_name="Tan Son Nhat International Airport",
+                dep_date=(2026, 4, 1),
+                arr_date=(2026, 4, 1),
+                dep_time=(16, 5),
+                arr_time=(17, 55),
+                flight_number=("9C", "7347"),
+                price=280,
+                token=None,
+            )
+        ]
+
+        query = create_query(
+            flights=[FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN")],
+            seat="economy",
+            trip="one-way",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+        )
+
+        async def _fake_fetch_booking_links_for_query(*args, **kwargs):
+            return [
+                "https://www.google.com/travel/clk/f?u=FIRST",
+                "https://www.google.com/travel/clk/f?u=SECOND",
+            ]
+
+        with patch(
+            "fast_flights.browser_capture.fetch_booking_links_for_query",
+            side_effect=_fake_fetch_booking_links_for_query,
+        ):
+            results = get_flights(
+                query,
+                integration=HtmlOnlyIntegration(_payload_html(payload)),
+                include_booking_urls=True,
+            )
+
+        self.assertEqual(
+            results[0].booking_url,
+            "https://www.google.com/travel/clk/f?u=FIRST",
+        )
 
 
 if __name__ == "__main__":

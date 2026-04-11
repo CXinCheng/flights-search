@@ -65,6 +65,11 @@ def _extract_booking_links(response_text: str) -> list[str]:
     return links
 
 
+def _extract_first_booking_link(response_text: str) -> str | None:
+    links = _extract_booking_links(response_text)
+    return links[0] if links else None
+
+
 async def _capture_response(response: Response, page: Page) -> CapturedBookingResponse:
     request = response.request
     post_data = request.post_data
@@ -162,9 +167,9 @@ async def fetch_booking_links(
     timeout_ms: int = 300000,
 ) -> list[str]:
     links: list[str] = []
-    seen: set[str] = set()
     done = asyncio.Event()
     pending_tasks: set[asyncio.Task[None]] = set()
+    first_link_lock = asyncio.Lock()
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=headless)
@@ -175,12 +180,15 @@ async def fetch_booking_links(
             if BOOKING_RESULTS_URL_PART not in response.url:
                 return
 
-            response_links = _extract_booking_links(await response.text())
-            for link in response_links:
-                if link not in seen:
-                    seen.add(link)
-                    links.append(link)
-            done.set()
+            link = _extract_first_booking_link(await response.text())
+            if link is None:
+                return
+
+            async with first_link_lock:
+                if links:
+                    return
+                links.append(link)
+                done.set()
 
         def schedule_response_capture(response: Response) -> None:
             task = asyncio.create_task(handle_response(response))
