@@ -24,11 +24,10 @@ class Integration(ABC):
         """
         raise NotImplementedError
 
-    def fetch_booking_links(self, q: Query, results: list[Flights], /) -> list[str] | None:
-        """Optionally fetch booking links for parsed results.
-
-        Return `None` to let the library decide how to obtain booking links.
-        """
+    def fetch_booking_links(
+        self, q: Query, results: list[Flights], /
+    ) -> list[str] | None:
+        """Optionally fetch booking links for parsed results."""
         return None
 
 

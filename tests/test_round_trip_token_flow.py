@@ -12,7 +12,13 @@ from fast_flights.browser_capture import (
 from fast_flights.fetcher import get_flights
 from fast_flights.integrations.base import Integration
 from fast_flights.parser import parse_js
-from fast_flights.querying import FlightQuery, Passengers, Query, create_query
+from fast_flights.querying import (
+    FlightQuery,
+    Passengers,
+    Query,
+    SelectedFlight,
+    create_query,
+)
 
 
 def _single_flight(
@@ -264,6 +270,40 @@ class RoundTripTokenTests(unittest.TestCase):
         self.assertIn(b"SGN", raw)
         self.assertIn(b"9C", raw)
         self.assertIn(b"7347", raw)
+
+    def test_one_way_followup_query_can_embed_multiple_selected_segments(self):
+        query = create_query(
+            flights=[FlightQuery(date="2026-04-01", from_airport="SIN", to_airport="JHB")],
+            seat="economy",
+            trip="one-way",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+            selected_flight_segments=[
+                SelectedFlight(
+                    from_airport="SIN",
+                    date="2026-04-01",
+                    to_airport="KUL",
+                    airline_code="AK",
+                    flight_number="123",
+                ),
+                SelectedFlight(
+                    from_airport="KUL",
+                    date="2026-04-01",
+                    to_airport="JHB",
+                    airline_code="AK",
+                    flight_number="456",
+                ),
+            ],
+        )
+        raw = b64decode(query.to_str())
+
+        self.assertGreaterEqual(raw.count(bytes([0x22])), 2)
+        self.assertIn(b"SIN", raw)
+        self.assertIn(b"KUL", raw)
+        self.assertIn(b"JHB", raw)
+        self.assertIn(b"123", raw)
+        self.assertIn(b"456", raw)
 
     def test_parse_round_trip_first_response_payload_2(self):
         payload = _base_payload()

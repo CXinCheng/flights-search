@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -13,6 +14,8 @@ from playwright.async_api import BrowserContext, Page, Response, async_playwrigh
 
 from .querying import Query
 
+logger = logging.getLogger(__name__)
+
 BOOKING_RESULTS_URL_PART = (
     "/_/FlightsFrontendUi/data/travel.frontend.flights.FlightsFrontendService/"
     "GetBookingResults"
@@ -20,8 +23,9 @@ BOOKING_RESULTS_URL_PART = (
 DEFAULT_OUTPUT_DIR = Path("captures") / "booking_results"
 BOOKING_LINK_BASE = "https://www.google.com/travel/clk/f"
 BOOKING_LINK_PATTERN = re.compile(
-    r'https://www\.google\.com/travel/clk/f\\?",\[\[\\?"u\\?",\\?"([^"\\]+)',
+    r'https://www\.google\.com/travel/clk/f\\?",\[\[\\?"u\\?",\\?"([^"\\]+)'
 )
+NO_LINK_GRACE_PERIOD_MS = 5000
 
 
 @dataclass
@@ -167,11 +171,6 @@ def _extract_booking_links(response_text: str) -> list[str]:
     return links
 
 
-def _extract_first_booking_link(response_text: str) -> str | None:
-    links = _extract_booking_links(response_text)
-    return links[0] if links else None
-
-
 async def _capture_response(response: Response, page: Page) -> CapturedBookingResponse:
     request = response.request
     post_data = request.post_data
@@ -270,6 +269,7 @@ async def fetch_booking_links(
 ) -> list[str]:
     links: list[str] = []
     done = asyncio.Event()
+    booking_response_seen = asyncio.Event()
     pending_tasks: set[asyncio.Task[None]] = set()
     first_link_lock = asyncio.Lock()
 
@@ -278,11 +278,27 @@ async def fetch_booking_links(
         context = await browser.new_context()
         page = await context.new_page()
 
+        async def _finish(result: list[str]) -> list[str]:
+            if pending_tasks:
+                await asyncio.gather(*pending_tasks, return_exceptions=True)
+            await context.close()
+            await browser.close()
+            return result
+
         async def handle_response(response: Response) -> None:
             if BOOKING_RESULTS_URL_PART not in response.url:
                 return
+            booking_response_seen.set()
 
-            link = _extract_first_booking_link(await response.text())
+            response_text = await response.text()
+            extracted_links = _extract_booking_links(response_text)
+            if not extracted_links:
+                logger.warning(
+                    "fetch_booking_links: booking response contained no extractable links; response prefix=%s",
+                    response_text[:500].replace("\n", "\\n"),
+                )
+
+            link = extracted_links[0] if extracted_links else None
             if link is None:
                 return
 
@@ -299,14 +315,26 @@ async def fetch_booking_links(
 
         page.on("response", schedule_response_capture)
         await page.goto(url, wait_until="domcontentloaded")
-        await asyncio.wait_for(done.wait(), timeout=timeout_ms / 1000)
+        try:
+            await asyncio.wait_for(booking_response_seen.wait(), timeout=timeout_ms / 1000)
+        except TimeoutError:
+            logger.warning(
+                "fetch_booking_links: timed out waiting for booking response; current_page=%s",
+                page.url,
+            )
+            return await _finish([])
 
-        if pending_tasks:
-            await asyncio.gather(*pending_tasks, return_exceptions=True)
-        await context.close()
-        await browser.close()
+        if not links:
+            try:
+                await asyncio.wait_for(done.wait(), timeout=NO_LINK_GRACE_PERIOD_MS / 1000)
+            except TimeoutError:
+                logger.warning(
+                    "fetch_booking_links: no extractable booking links found after booking response; current_page=%s",
+                    page.url,
+                )
+                return await _finish([])
 
-    return links
+        return await _finish(links)
 
 
 async def fetch_booking_links_for_query(
@@ -331,7 +359,7 @@ async def capture_booking_results_for_query(
     max_matches: int | None = None,
 ) -> list[Path]:
     return await capture_booking_results(
-        url=query.url(),
+        url=query.booking_url(),
         output_dir=output_dir,
         headless=headless,
         timeout_ms=timeout_ms,

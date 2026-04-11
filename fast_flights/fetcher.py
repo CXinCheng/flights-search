@@ -21,11 +21,7 @@ def get_flights(
     booking_headless: bool = True,
     booking_timeout_ms: int = 300000,
 ) -> MetaList:
-    """Get flights using a str query.
-
-    Examples:
-    - *Flights from TPE to MYJ on 2025-12-22 one way economy class*
-    """
+    """Get flights using a str query."""
 
 
 @overload
@@ -38,28 +34,7 @@ def get_flights(
     booking_headless: bool = True,
     booking_timeout_ms: int = 300000,
 ) -> MetaList:
-    """Get flights using a structured query.
-
-    Example:
-    ```python
-    get_flights(
-        query(
-            flights=[
-                FlightQuery(
-                    date="2025-12-22",
-                    from_airport="TPE",
-                    to_airport="MYJ",
-                )
-            ],
-            seat="economy",
-            trip="one-way",
-            passengers=Passengers(adults=1),
-            language="en-US",
-            currency="",
-        )
-    )
-    ```
-    """
+    """Get flights using a structured query."""
 
 
 def get_flights(
@@ -72,12 +47,7 @@ def get_flights(
     booking_headless: bool = True,
     booking_timeout_ms: int = 300000,
 ) -> MetaList:
-    """Get flights.
-
-    Args:
-        q: The query.
-        proxy (str, optional): Proxy.
-    """
+    """Get flights."""
     html = fetch_flights_html(q, proxy=proxy, integration=integration)
     use_payload3 = isinstance(q, Query) and bool(q.tfu)
     results = parse(html, use_payload3=use_payload3)
@@ -101,12 +71,7 @@ def fetch_flights_html(
     proxy: str | None = None,
     integration: Integration | None = None,
 ) -> str:
-    """Fetch flights and get the **HTML**.
-
-    Args:
-        q: The query.
-        proxy (str, optional): Proxy.
-    """
+    """Fetch flights and get the HTML."""
     if integration is None:
         client = Client(
             impersonate="chrome_145",
@@ -118,15 +83,13 @@ def fetch_flights_html(
 
         if isinstance(q, Query):
             params = q.params()
-
         else:
             params = {"q": q}
 
         res = client.get(URL, params=params)
         return res.text
 
-    else:
-        return integration.fetch_html(q)
+    return integration.fetch_html(q)
 
 
 def _attach_booking_urls(
@@ -140,11 +103,9 @@ def _attach_booking_urls(
     if not results or not isinstance(q, Query):
         return
 
-    # One-way booking URLs are only valid for selected-flight follow-up calls.
     if q.trip == Trip.ONE_WAY and q.selected_flight is None:
         return
 
-    # Round-trip booking URLs are only valid after both outbound and return are selected.
     if q.trip == Trip.ROUND_TRIP and (
         not q.tfu
         or q.selected_outbound_flight is None
