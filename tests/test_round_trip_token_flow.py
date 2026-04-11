@@ -5,7 +5,10 @@ from base64 import b64decode
 from datetime import datetime
 from unittest.mock import patch
 
-from fast_flights.browser_capture import _extract_first_booking_link
+from fast_flights.browser_capture import (
+    _extract_booking_links_from_structured_response,
+    _extract_first_booking_link,
+)
 from fast_flights.fetcher import get_flights
 from fast_flights.integrations.base import Integration
 from fast_flights.parser import parse_js
@@ -111,8 +114,8 @@ class StubIntegration(Integration):
         self.booking_link_calls.append(q)
         if len(q.flight_data) == 1 and q.selected_flight:
             return ["https://www.google.com/travel/clk/f?u=ONEWAY-FOLLOWUP"]
-        if q.tfu:
-            return ["https://www.google.com/travel/clk/f?u=RETURN"]
+        if q.tfu and q.selected_outbound_flight and q.selected_return_flight:
+            return ["https://www.google.com/travel/clk/f?u=ROUNDTRIP-FINAL"]
         return []
 
 
@@ -152,6 +155,23 @@ class RoundTripTokenTests(unittest.TestCase):
         self.assertIsNotNone(link)
         self.assertTrue(link.startswith("https://www.google.com/travel/clk/f?u="))
 
+    def test_extract_round_trip_booking_links_from_structured_booking_response(self):
+        sample_path = (
+            Path(__file__).resolve().parents[2]
+            / "ai-docs"
+            / "round-trip-booking-results-response-sample.json"
+        )
+        response_text = json.loads(sample_path.read_text(encoding="utf-8"))[
+            "response_text"
+        ]
+
+        links = _extract_booking_links_from_structured_response(response_text)
+
+        self.assertEqual(len(links), 2)
+        self.assertTrue(
+            links[0].startswith("https://www.google.com/travel/clk/f?u=")
+        )
+
     def test_query_params_without_and_with_tfu(self):
         without_tfu = create_query(
             flights=[FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN")],
@@ -175,6 +195,8 @@ class RoundTripTokenTests(unittest.TestCase):
         )
         self.assertEqual(with_tfu.params()["tfu"], "TOKEN-123")
         self.assertIn("tfu=TOKEN-123", with_tfu.url())
+        self.assertNotIn("tfu", with_tfu.booking_params())
+        self.assertNotIn("tfu=", with_tfu.booking_url())
 
     def test_followup_query_can_embed_selected_outbound_fields(self):
         query = create_query(
@@ -198,6 +220,31 @@ class RoundTripTokenTests(unittest.TestCase):
         self.assertIn(b"SGN", raw)
         self.assertIn(b"9C", raw)
         self.assertIn(b"7347", raw)
+
+    def test_final_round_trip_booking_query_can_embed_selected_return_fields(self):
+        query = create_query(
+            flights=[
+                FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN"),
+                FlightQuery(date=datetime(2026, 4, 5), from_airport="SGN", to_airport="CAN"),
+            ],
+            seat="economy",
+            trip="round-trip",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+            tfu="TOKEN-123",
+            selected_outbound_airline_code="9C",
+            selected_outbound_flight_number="7347",
+            selected_return_airline_code="9C",
+            selected_return_flight_number="7348",
+        )
+        raw = b64decode(query.to_str())
+
+        self.assertGreaterEqual(raw.count(bytes([0x22])), 2)
+        self.assertIn(b"CAN", raw)
+        self.assertIn(b"SGN", raw)
+        self.assertIn(b"7347", raw)
+        self.assertIn(b"7348", raw)
 
     def test_one_way_followup_query_can_embed_selected_flight_fields_without_tfu(self):
         query = create_query(
@@ -451,7 +498,7 @@ class RoundTripTokenTests(unittest.TestCase):
             "https://www.google.com/travel/clk/f?u=ONEWAY-FOLLOWUP",
         )
 
-    def test_round_trip_booking_url_is_only_added_on_second_call(self):
+    def test_round_trip_booking_url_is_only_added_on_final_selected_return_call(self):
         first_payload = _base_payload()
         first_payload[2][0] = [
             _flight_row(
@@ -529,16 +576,43 @@ class RoundTripTokenTests(unittest.TestCase):
             language="en-US",
             currency="SGD",
             tfu=outbound_results[0].tfu_token,
+            selected_outbound_airline_code="9C",
+            selected_outbound_flight_number="7347",
         )
         return_results = get_flights(
             return_query,
             integration=integration,
             include_booking_urls=True,
         )
-        self.assertEqual(
-            return_results[0].booking_url,
-            "https://www.google.com/travel/clk/f?u=RETURN",
+        self.assertIsNone(return_results[0].booking_url)
+        self.assertEqual(len(integration.booking_link_calls), 0)
+
+        final_booking_query = create_query(
+            flights=[
+                FlightQuery(date="2026-04-01", from_airport="CAN", to_airport="SGN"),
+                FlightQuery(date="2026-04-05", from_airport="SGN", to_airport="CAN"),
+            ],
+            seat="economy",
+            trip="round-trip",
+            passengers=Passengers(adults=1),
+            language="en-US",
+            currency="SGD",
+            tfu=outbound_results[0].tfu_token,
+            selected_outbound_airline_code="9C",
+            selected_outbound_flight_number="7347",
+            selected_return_airline_code="9C",
+            selected_return_flight_number="7348",
         )
+        final_results = get_flights(
+            final_booking_query,
+            integration=integration,
+            include_booking_urls=True,
+        )
+        self.assertEqual(
+            final_results[0].booking_url,
+            "https://www.google.com/travel/clk/f?u=ROUNDTRIP-FINAL",
+        )
+        self.assertIsNone(final_results[0].tfu_token)
         self.assertEqual(len(integration.booking_link_calls), 1)
 
     def test_playwright_fallback_only_uses_first_booking_link(self):

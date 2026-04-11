@@ -66,10 +66,41 @@ def _maybe_parse_json_string(value: Any) -> Any | None:
         return None
 
 
-def _iter_nested_values(value: Any):
+def _iter_response_roots(value: Any):
     decoded = _maybe_parse_json_string(value)
     if decoded is not None:
-        yield from _iter_nested_values(decoded)
+        yield decoded
+        return
+
+    if not isinstance(value, str):
+        return
+
+    stripped = value.lstrip()
+    if stripped.startswith(")]}'"):
+        _, _, stripped = stripped.partition("\n")
+
+    lines = [line.strip() for line in stripped.splitlines() if line.strip()]
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.isdigit() and i + 1 < len(lines):
+            decoded = _maybe_parse_json_string(lines[i + 1])
+            if decoded is not None:
+                yield decoded
+                i += 2
+                continue
+
+        decoded = _maybe_parse_json_string(line)
+        if decoded is not None:
+            yield decoded
+        i += 1
+
+
+def _iter_nested_values(value: Any):
+    roots = list(_iter_response_roots(value))
+    if roots:
+        for root in roots:
+            yield from _iter_nested_values(root)
         return
 
     yield value

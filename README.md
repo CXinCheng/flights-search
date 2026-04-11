@@ -11,7 +11,13 @@ pip install fast-flights
 ## Core API
 
 ```python
-from fast_flights import FlightQuery, Passengers, create_query, get_flights
+from fast_flights import (
+    FlightQuery,
+    Passengers,
+    create_query,
+    fetch_booking_links_for_query,
+    get_flights,
+)
 ```
 
 - `create_query(...)` builds the request.
@@ -22,7 +28,15 @@ from fast_flights import FlightQuery, Passengers, create_query, get_flights
 ## One-way Example (2-step selected-flight flow)
 
 ```python
-from fast_flights import FlightQuery, Passengers, create_query, get_flights
+import asyncio
+
+from fast_flights import (
+    FlightQuery,
+    Passengers,
+    create_query,
+    fetch_booking_links_for_query,
+    get_flights,
+)
 
 query = create_query(
     flights=[
@@ -76,9 +90,9 @@ for i, option in enumerate(results, start=1):
     )
 ```
 
-## Round-trip Example (2-step token flow)
+## Round-trip Example (3-step selected-itinerary flow)
 
-For round-trip, use two calls:
+For round-trip, use three calls:
 
 1. Call once to get outbound options and collect:
 - `tfu_token`
@@ -86,6 +100,8 @@ For round-trip, use two calls:
 - outbound flight number (`flight_number_numeric`)
 
 2. Call again with those values to get return options tied to the selected outbound.
+
+3. After choosing a return option, call a final booking lookup with both the selected outbound and selected return identifiers to obtain the booking URL.
 
 ```python
 from fast_flights import FlightQuery, Passengers, create_query, get_flights
@@ -124,9 +140,30 @@ step2_query = create_query(
     selected_outbound_airline_code=selected_outbound_airline_code,
     selected_outbound_flight_number=selected_outbound_flight_number,
 )
-step2_results = get_flights(step2_query, include_booking_urls=True)
+step2_results = get_flights(step2_query)
 
-for i, option in enumerate(step2_results, start=1):
+selected_return = step2_results[0]
+selected_return_leg = selected_return.flights[0]
+
+# Step 3: booking lookup for the selected round-trip itinerary
+step3_query = create_query(
+    flights=flights,
+    seat="economy",
+    trip="round-trip",
+    passengers=Passengers(adults=1),
+    language="en-US",
+    currency="SGD",
+    tfu=selected_token,
+    selected_outbound_airline_code=selected_outbound_airline_code,
+    selected_outbound_flight_number=selected_outbound_flight_number,
+    selected_return_airline_code=selected_return_leg.flight_number_airline_code,
+    selected_return_flight_number=selected_return_leg.flight_number_numeric,
+)
+booking_links = asyncio.run(fetch_booking_links_for_query(step3_query))
+selected_return.booking_url = booking_links[0]
+step3_results = [selected_return]
+
+for i, option in enumerate(step3_results, start=1):
     first_leg = option.flights[0]
     print(
         i,
@@ -173,6 +210,12 @@ Step 1:
 Step 2 (round-trip return lookup with selected token) can return entries like:
 
 ```text
+price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348, booking_url=None
+```
+
+Step 3 (final selected-itinerary booking lookup) can return entries like:
+
+```text
 price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348, booking_url=https://www.google.com/travel/clk/f?u=...
 ```
 
@@ -181,8 +224,10 @@ price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348, booking_url=https
 - Airport values are IATA codes (for example: `CAN`, `SGN`).
 - Dates use `YYYY-MM-DD`.
 - `step1_results` can contain multiple outbound options; your app should decide which one to select before step 2.
+- `step2_results` can contain multiple return options; your app should decide which one to select before step 3.
 - `booking_url` for one-way is only populated on a selected-flight follow-up call.
-- For round-trip flows, `booking_url` is only populated on the second call with `tfu=...`.
+- For round-trip flows, the final booking lookup uses the selected-itinerary booking page URL and does not carry `tfu`.
+- `booking_url` for round-trip is only populated after both outbound and return are selected.
 
 
 ---

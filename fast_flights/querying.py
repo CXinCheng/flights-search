@@ -63,10 +63,12 @@ def _encode_selected_flight_field(s: SelectedFlight) -> bytes:
     return bytes([(4 << 3) | 2]) + _encode_varint(len(payload)) + payload
 
 
-def _inject_selected_flight(info_bytes: bytes, selected: SelectedFlight) -> bytes:
+def _inject_selected_flights(
+    info_bytes: bytes, selected_by_leg: dict[int, SelectedFlight]
+) -> bytes:
     i = 0
     out = bytearray()
-    injected = False
+    flight_data_index = 0
 
     while i < len(info_bytes):
         tag_pos = i
@@ -90,15 +92,15 @@ def _inject_selected_flight(info_bytes: bytes, selected: SelectedFlight) -> byte
             out.extend(info_bytes[tag_pos:])
             break
 
-        if field_no == 3 and not injected:
+        selected = selected_by_leg.get(flight_data_index) if field_no == 3 else None
+        if field_no == 3:
             original_flight_data = info_bytes[value_start:value_end]
-            enriched_flight_data = (
-                original_flight_data + _encode_selected_flight_field(selected)
-            )
+            if selected is not None:
+                original_flight_data += _encode_selected_flight_field(selected)
             out.extend(_encode_varint(tag))
-            out.extend(_encode_varint(len(enriched_flight_data)))
-            out.extend(enriched_flight_data)
-            injected = True
+            out.extend(_encode_varint(len(original_flight_data)))
+            out.extend(original_flight_data)
+            flight_data_index += 1
         else:
             out.extend(info_bytes[tag_pos:value_end])
         i = value_end
@@ -118,6 +120,8 @@ class Query:
     currency: str
     tfu: str | None = None
     selected_flight: SelectedFlight | None = None
+    selected_outbound_flight: SelectedFlight | None = None
+    selected_return_flight: SelectedFlight | None = None
 
     def pb(self) -> Info:
         """(internal) Protobuf data. (`Info`)"""
@@ -131,8 +135,15 @@ class Query:
     def to_bytes(self) -> bytes:
         """Convert this query to bytes."""
         data = self.pb().SerializeToString()
+        selected_by_leg: dict[int, SelectedFlight] = {}
         if self.selected_flight is not None:
-            return _inject_selected_flight(data, self.selected_flight)
+            selected_by_leg[0] = self.selected_flight
+        if self.selected_outbound_flight is not None:
+            selected_by_leg[0] = self.selected_outbound_flight
+        if self.selected_return_flight is not None:
+            selected_by_leg[1] = self.selected_return_flight
+        if selected_by_leg:
+            return _inject_selected_flights(data, selected_by_leg)
         return data
 
     def to_str(self) -> str:
@@ -159,7 +170,7 @@ class Query:
     def booking_url(self) -> str:
         """Get the Google Flights booking page URL for this query."""
         return "https://www.google.com/travel/flights/booking?" + urlencode(
-            self.params()
+            self.booking_params()
         )
 
     def params(self) -> dict[str, str]:
@@ -168,6 +179,14 @@ class Query:
         if self.tfu:
             params["tfu"] = self.tfu
         return params
+
+    def booking_params(self) -> dict[str, str]:
+        """Create params for the booking page.
+
+        Google Flights booking URLs use the selected-itinerary `tfs` payload directly
+        and do not carry the intermediate round-trip `tfu` token.
+        """
+        return {"tfs": self.to_str(), "hl": self.language, "curr": self.currency}
 
     def __repr__(self) -> str:
         return "Query(...)"
@@ -260,6 +279,8 @@ def create_query(
     selected_flight_number: str | None = None,
     selected_outbound_airline_code: str | None = None,
     selected_outbound_flight_number: str | None = None,
+    selected_return_airline_code: str | None = None,
+    selected_return_flight_number: str | None = None,
 ) -> Query:
     """Create a query.
 
@@ -276,31 +297,51 @@ def create_query(
         selected_flight_number (optional): Flight number of selected flight.
         selected_outbound_airline_code (optional): Airline code of selected outbound.
         selected_outbound_flight_number (optional): Flight number of selected outbound.
+        selected_return_airline_code (optional): Airline code of selected return.
+        selected_return_flight_number (optional): Flight number of selected return.
     """
-    selected_airline_code = selected_flight_airline_code
-    selected_flight_numeric = selected_flight_number
-    if selected_airline_code is None:
-        selected_airline_code = selected_outbound_airline_code
-    if selected_flight_numeric is None:
-        selected_flight_numeric = selected_outbound_flight_number
+    def _build_selected_flight(
+        flight_query: FlightQuery,
+        *,
+        airline_code: str | None,
+        flight_number: str | None,
+    ) -> SelectedFlight | None:
+        if not airline_code or not flight_number:
+            return None
+        if isinstance(flight_query.date, str):
+            flight_date = flight_query.date
+        else:
+            flight_date = flight_query.date.strftime("%Y-%m-%d")
+        return SelectedFlight(
+            from_airport=flight_query.from_airport,
+            date=flight_date,
+            to_airport=flight_query.to_airport,
+            airline_code=airline_code,
+            flight_number=flight_number,
+        )
 
     selected_flight = None
-    if (
-        flights
-        and selected_airline_code
-        and selected_flight_numeric
-    ):
-        first_flight = flights[0]
-        if isinstance(first_flight.date, str):
-            first_date = first_flight.date
-        else:
-            first_date = first_flight.date.strftime("%Y-%m-%d")
-        selected_flight = SelectedFlight(
-            from_airport=first_flight.from_airport,
-            date=first_date,
-            to_airport=first_flight.to_airport,
-            airline_code=selected_airline_code,
-            flight_number=selected_flight_numeric,
+    if flights:
+        selected_flight = _build_selected_flight(
+            flights[0],
+            airline_code=selected_flight_airline_code,
+            flight_number=selected_flight_number,
+        )
+
+    selected_outbound_flight = None
+    if flights:
+        selected_outbound_flight = _build_selected_flight(
+            flights[0],
+            airline_code=selected_outbound_airline_code,
+            flight_number=selected_outbound_flight_number,
+        )
+
+    selected_return_flight = None
+    if len(flights) > 1:
+        selected_return_flight = _build_selected_flight(
+            flights[1],
+            airline_code=selected_return_airline_code,
+            flight_number=selected_return_flight_number,
         )
 
     return Query(
@@ -312,4 +353,6 @@ def create_query(
         currency=currency,
         tfu=tfu,
         selected_flight=selected_flight,
+        selected_outbound_flight=selected_outbound_flight,
+        selected_return_flight=selected_return_flight,
     )

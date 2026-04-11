@@ -144,8 +144,12 @@ def _attach_booking_urls(
     if q.trip == Trip.ONE_WAY and q.selected_flight is None:
         return
 
-    # Round-trip booking URLs are only valid for the second-step follow-up call.
-    if q.trip == Trip.ROUND_TRIP and not q.tfu:
+    # Round-trip booking URLs are only valid after both outbound and return are selected.
+    if q.trip == Trip.ROUND_TRIP and (
+        not q.tfu
+        or q.selected_outbound_flight is None
+        or q.selected_return_flight is None
+    ):
         return
 
     booking_links: list[str] | None = None
@@ -166,3 +170,5 @@ def _attach_booking_urls(
 
     for result, booking_link in zip(results, booking_links):
         result.booking_url = booking_link
+        if q.trip == Trip.ROUND_TRIP and q.selected_return_flight is not None:
+            result.tfu_token = None
