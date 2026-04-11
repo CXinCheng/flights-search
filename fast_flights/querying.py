@@ -9,7 +9,7 @@ from .types import Currency, Language, SeatType, TripType
 
 
 @dataclass
-class SelectedOutbound:
+class SelectedFlight:
     from_airport: str
     date: str
     to_airport: str
@@ -49,7 +49,7 @@ def _wire_str(field_no: int, value: str) -> bytes:
     return bytes([(field_no << 3) | 2]) + _encode_varint(len(payload)) + payload
 
 
-def _encode_selected_outbound_field(s: SelectedOutbound) -> bytes:
+def _encode_selected_flight_field(s: SelectedFlight) -> bytes:
     payload = b"".join(
         [
             _wire_str(1, s.from_airport),
@@ -63,7 +63,7 @@ def _encode_selected_outbound_field(s: SelectedOutbound) -> bytes:
     return bytes([(4 << 3) | 2]) + _encode_varint(len(payload)) + payload
 
 
-def _inject_selected_outbound(info_bytes: bytes, selected: SelectedOutbound) -> bytes:
+def _inject_selected_flight(info_bytes: bytes, selected: SelectedFlight) -> bytes:
     i = 0
     out = bytearray()
     injected = False
@@ -93,7 +93,7 @@ def _inject_selected_outbound(info_bytes: bytes, selected: SelectedOutbound) -> 
         if field_no == 3 and not injected:
             original_flight_data = info_bytes[value_start:value_end]
             enriched_flight_data = (
-                original_flight_data + _encode_selected_outbound_field(selected)
+                original_flight_data + _encode_selected_flight_field(selected)
             )
             out.extend(_encode_varint(tag))
             out.extend(_encode_varint(len(enriched_flight_data)))
@@ -117,7 +117,7 @@ class Query:
     language: str
     currency: str
     tfu: str | None = None
-    selected_outbound: SelectedOutbound | None = None
+    selected_flight: SelectedFlight | None = None
 
     def pb(self) -> Info:
         """(internal) Protobuf data. (`Info`)"""
@@ -131,12 +131,8 @@ class Query:
     def to_bytes(self) -> bytes:
         """Convert this query to bytes."""
         data = self.pb().SerializeToString()
-        if (
-            self.tfu
-            and self.trip == Trip.ROUND_TRIP
-            and self.selected_outbound is not None
-        ):
-            return _inject_selected_outbound(data, self.selected_outbound)
+        if self.selected_flight is not None:
+            return _inject_selected_flight(data, self.selected_flight)
         return data
 
     def to_str(self) -> str:
@@ -260,6 +256,8 @@ def create_query(
     currency: str | Literal[""] | Currency = "",
     max_stops: int | None = None,
     tfu: str | None = None,
+    selected_flight_airline_code: str | None = None,
+    selected_flight_number: str | None = None,
     selected_outbound_airline_code: str | None = None,
     selected_outbound_flight_number: str | None = None,
 ) -> Query:
@@ -274,28 +272,35 @@ def create_query(
         currency: Set the currency. Use `""` (blank str) to let Google decide.
         max_stops (optional): Set the maximum stops for every flight query, if present.
         tfu (optional): Search token from a prior round-trip call for second-step lookup.
+        selected_flight_airline_code (optional): Airline code of selected flight.
+        selected_flight_number (optional): Flight number of selected flight.
         selected_outbound_airline_code (optional): Airline code of selected outbound.
         selected_outbound_flight_number (optional): Flight number of selected outbound.
     """
-    selected_outbound = None
+    selected_airline_code = selected_flight_airline_code
+    selected_flight_numeric = selected_flight_number
+    if selected_airline_code is None:
+        selected_airline_code = selected_outbound_airline_code
+    if selected_flight_numeric is None:
+        selected_flight_numeric = selected_outbound_flight_number
+
+    selected_flight = None
     if (
-        tfu
-        and trip == "round-trip"
-        and flights
-        and selected_outbound_airline_code
-        and selected_outbound_flight_number
+        flights
+        and selected_airline_code
+        and selected_flight_numeric
     ):
         first_flight = flights[0]
         if isinstance(first_flight.date, str):
             first_date = first_flight.date
         else:
             first_date = first_flight.date.strftime("%Y-%m-%d")
-        selected_outbound = SelectedOutbound(
+        selected_flight = SelectedFlight(
             from_airport=first_flight.from_airport,
             date=first_date,
             to_airport=first_flight.to_airport,
-            airline_code=selected_outbound_airline_code,
-            flight_number=selected_outbound_flight_number,
+            airline_code=selected_airline_code,
+            flight_number=selected_flight_numeric,
         )
 
     return Query(
@@ -306,5 +311,5 @@ def create_query(
         language=language,
         currency=currency,
         tfu=tfu,
-        selected_outbound=selected_outbound,
+        selected_flight=selected_flight,
     )

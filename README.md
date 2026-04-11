@@ -17,8 +17,9 @@ from fast_flights import FlightQuery, Passengers, create_query, get_flights
 - `create_query(...)` builds the request.
 - `get_flights(query)` fetches and parses results.
 - Each result item includes fields like `price`, `airlines`, `flights`, `tfu_token`, and `booking_url`.
+- One-way booking URLs require a second query built from the selected flight.
 
-## One-way Example
+## One-way Example (2-step selected-flight flow)
 
 ```python
 from fast_flights import FlightQuery, Passengers, create_query, get_flights
@@ -38,7 +39,28 @@ query = create_query(
     currency="SGD",
 )
 
-results = get_flights(query, include_booking_urls=True)
+results = get_flights(query)
+selected = results[0]
+selected_first_leg = selected.flights[0]
+
+followup_query = create_query(
+    flights=[
+        FlightQuery(
+            date="2026-04-01",
+            from_airport="CAN",
+            to_airport="SGN",
+        )
+    ],
+    seat="economy",
+    trip="one-way",
+    passengers=Passengers(adults=1),
+    language="en-US",
+    currency="SGD",
+    selected_flight_airline_code=selected_first_leg.flight_number_airline_code,
+    selected_flight_number=selected_first_leg.flight_number_numeric,
+)
+
+results = get_flights(followup_query, include_booking_urls=True)
 
 for i, option in enumerate(results, start=1):
     first_leg = option.flights[0]
@@ -159,7 +181,7 @@ price=280, airlines=['Spring'], route=SGN->CAN, flight=9C7348, booking_url=https
 - Airport values are IATA codes (for example: `CAN`, `SGN`).
 - Dates use `YYYY-MM-DD`.
 - `step1_results` can contain multiple outbound options; your app should decide which one to select before step 2.
-- `booking_url` is available for one-way calls when you pass `include_booking_urls=True`.
+- `booking_url` for one-way is only populated on a selected-flight follow-up call.
 - For round-trip flows, `booking_url` is only populated on the second call with `tfu=...`.
 
 

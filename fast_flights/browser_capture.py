@@ -52,9 +52,80 @@ def _ensure_dir(path: Path) -> Path:
     return path
 
 
+def _maybe_parse_json_string(value: Any) -> Any | None:
+    if not isinstance(value, str):
+        return None
+
+    stripped = value.strip()
+    if not stripped or stripped[0] not in "[{":
+        return None
+
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+
+
+def _iter_nested_values(value: Any):
+    decoded = _maybe_parse_json_string(value)
+    if decoded is not None:
+        yield from _iter_nested_values(decoded)
+        return
+
+    yield value
+
+    if isinstance(value, list):
+        for item in value:
+            yield from _iter_nested_values(item)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_nested_values(item)
+
+
+def _extract_u_param_from_pairs(value: Any) -> str | None:
+    if not isinstance(value, list):
+        return None
+
+    for item in value:
+        if (
+            isinstance(item, list)
+            and len(item) >= 2
+            and item[0] == "u"
+            and isinstance(item[1], str)
+        ):
+            return item[1]
+    return None
+
+
+def _extract_booking_links_from_structured_response(response_text: str) -> list[str]:
+    links: list[str] = []
+    seen: set[str] = set()
+
+    for value in _iter_nested_values(response_text):
+        if (
+            isinstance(value, list)
+            and len(value) >= 2
+            and value[0] == BOOKING_LINK_BASE
+        ):
+            token = _extract_u_param_from_pairs(value[1])
+            if token is None:
+                continue
+
+            link = f"{BOOKING_LINK_BASE}?{urlencode({'u': token})}"
+            if link not in seen:
+                seen.add(link)
+                links.append(link)
+
+    return links
+
+
 def _extract_booking_links(response_text: str) -> list[str]:
     links: list[str] = []
     seen: set[str] = set()
+
+    for link in _extract_booking_links_from_structured_response(response_text):
+        seen.add(link)
+        links.append(link)
 
     for token in BOOKING_LINK_PATTERN.findall(response_text):
         link = f"{BOOKING_LINK_BASE}?{urlencode({'u': token})}"

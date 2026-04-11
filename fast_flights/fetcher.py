@@ -140,6 +140,10 @@ def _attach_booking_urls(
     if not results or not isinstance(q, Query):
         return
 
+    # One-way booking URLs are only valid for selected-flight follow-up calls.
+    if q.trip == Trip.ONE_WAY and q.selected_flight is None:
+        return
+
     # Round-trip booking URLs are only valid for the second-step follow-up call.
     if q.trip == Trip.ROUND_TRIP and not q.tfu:
         return
