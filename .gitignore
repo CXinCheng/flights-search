@@ -9,3 +9,6 @@
 protoc.exe
 
 dist/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

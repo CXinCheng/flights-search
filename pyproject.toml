@@ -47,3 +47,17 @@ dev = [
     "ipykernel>=6.29.5",
     "pip>=25.0.1",
 ]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+fast-flights = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+local = { features = ["local"], solve-group = "default" }
+
+[tool.pixi.tasks]
