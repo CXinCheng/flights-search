@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
+from .client import fetch_search_html
+from .encoder import encode_search_request
 from .models import BookingRequest, FlightSearchRequest, SearchResults, SelectedItinerary
+from .parser import parse_search_html
 
 
 def search_flights(request: FlightSearchRequest) -> SearchResults:
     """Search Google Flights for the provided request.
-
-    The HTTP client and parser subsystems are not implemented in this first
-    slice, so the search runtime intentionally remains a stub.
     """
-
-    raise NotImplementedError(
-        "search_flights() will be implemented after the client and parser "
-        "subsystems land."
-    )
+    encoded = encode_search_request(request)
+    html = fetch_search_html(encoded.params)
+    return parse_search_html(html)
 
 
 def build_booking_request(

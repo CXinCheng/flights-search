@@ -29,5 +29,9 @@ Planned tasks:
 - `pixi run format`
 - `pixi run docs-check`
 
-Until the runtime client and parser land, the root package currently contains
-the typed model layer plus an internal request encoder scaffold.
+The root package now includes the typed model layer, internal request
+encoding, a basic initial search runtime path, and parser coverage for the
+committed synthetic payload shapes.
+
+Booking URL resolution and the public round-trip follow-up runtime flow are
+still in progress.

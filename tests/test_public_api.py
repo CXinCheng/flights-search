@@ -40,6 +40,9 @@ class PublicApiTests(unittest.TestCase):
         self.assertEqual(booking_request.search_request, request)
         self.assertEqual(booking_request.itinerary, itinerary)
 
+    def test_search_flights_is_callable(self) -> None:
+        self.assertTrue(callable(flights_search.search_flights))
+
 
 if __name__ == "__main__":
     unittest.main()

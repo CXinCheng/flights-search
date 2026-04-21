@@ -5,12 +5,11 @@
 Last reviewed: 2026-04-21
 
 The root `flights_search` package has an implemented typed model layer, a
-working request encoder, top-level API exports, and test coverage for those
-pieces.
+working request encoder, a basic HTTP client, HTML/payload parser support,
+top-level API exports, and test coverage for those pieces.
 
-The runtime search, parser, HTTP client, and booking-resolution subsystems are
-not implemented yet. They currently exist as placeholders or `NotImplemented`
-API stubs.
+The runtime booking-resolution subsystem is still not implemented. The public
+runtime API also does not yet expose the round-trip follow-up search step.
 
 ## Current Repo Status
 
@@ -24,16 +23,17 @@ API stubs.
 - Initial search request encoding in `src/flights_search/encoder/request.py`
 - Follow-up request encoding with continuation support
 - Booking request encoding for explicit selected itineraries
-- Tests for models, encoder behavior, payload fixture documentation, and public
-  API exports
+- HTTP retrieval helper in `src/flights_search/client/`
+- HTML and payload parsing in `src/flights_search/parser/`
+- `search_flights(...)` wired through encoder + client + parser
+- Tests for models, encoder behavior, parser behavior, payload fixture
+  documentation, search API wiring, and public API exports
 
 ### Present but not implemented
 
-- `search_flights(...)`
 - `get_booking_urls(...)`
-- `src/flights_search/client/`
-- `src/flights_search/parser/`
 - `src/flights_search/booking/`
+- public follow-up search helper for round-trip selection flow
 
 ## Verification
 
@@ -45,25 +45,26 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 Result:
 
-- 19 tests ran
+- 25 tests ran
 - all tests passed
 
 ## Status By Area
 
 ### Public API
 
-Status: partially implemented
+Status: implemented first runtime slice
 
 Completed:
 
 - public model exports are in place
+- `search_flights(...)` executes the initial search runtime path
 - `build_booking_request(...)` returns a typed `BookingRequest`
 - `get_booking_url(...)` convenience wrapper exists
 
 Remaining:
 
-- `search_flights(...)` runtime implementation
 - `get_booking_urls(...)` runtime implementation
+- explicit public follow-up search API for round-trip outbound selection
 
 ### Models
 
@@ -102,23 +103,25 @@ Remaining:
 
 ### Client
 
-Status: not started
+Status: implemented first slice
 
 Remaining:
 
-- choose and implement the HTTP client contract
-- define retry, timeout, headers, and cookie behavior
-- return retrievable Google Flights HTML for parser fixtures and runtime use
+- decide whether to add retries and cookie persistence on top of the current
+  `httpx` retrieval helper
+- validate the current headers and timeout choices against stable live
+  retrieval behavior once environment access is available
 
 ### Parser
 
-Status: not started
+Status: implemented first slice
 
 Remaining:
 
-- parse initial search payloads into `SearchResults`
-- parse follow-up payloads into `SearchResults`
-- attach continuation data without exposing raw transport terminology
+- expand beyond the committed synthetic payload shapes
+- validate parser behavior against stable live HTML fixtures
+- decide whether airline/alliance metadata should remain internal-only or gain
+  a typed surface later
 
 ### Booking
 
@@ -132,9 +135,9 @@ Remaining:
 
 ## Recommended Next Steps
 
-1. Implement the client subsystem so encoded requests can fetch HTML fixtures
-   and live pages through a stable interface.
-2. Implement the parser for the committed payload fixtures and convert that into
-   `search_flights(...)`.
-3. Implement booking-link resolution only after the search and follow-up parse
-   path is working end to end.
+1. Add a public follow-up round-trip helper that accepts the outbound
+   selection plus continuation handle and returns return-leg `SearchResults`.
+2. Validate the client/parser path against real captured HTML fixtures once a
+   stable retrieval setup is available.
+3. Implement booking-link resolution only after the search and follow-up path
+   is exposed end to end.

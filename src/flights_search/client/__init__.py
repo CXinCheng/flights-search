@@ -1,1 +1,5 @@
-"""HTTP client subsystem placeholder."""
+"""HTTP client helpers for Google Flights retrieval."""
+
+from .http import SearchHttpClient, fetch_search_html
+
+__all__ = ["SearchHttpClient", "fetch_search_html"]
