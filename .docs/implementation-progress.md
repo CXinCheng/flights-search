@@ -8,8 +8,7 @@ The root `flights_search` package has an implemented typed model layer, a
 working request encoder, a basic HTTP client, HTML/payload parser support,
 top-level API exports, and test coverage for those pieces.
 
-The runtime booking-resolution subsystem is still not implemented. The public
-runtime API also does not yet expose the round-trip follow-up search step.
+The runtime booking-resolution subsystem is still not implemented.
 
 ## Current Repo Status
 
@@ -26,6 +25,8 @@ runtime API also does not yet expose the round-trip follow-up search step.
 - HTTP retrieval helper in `src/flights_search/client/`
 - HTML and payload parsing in `src/flights_search/parser/`
 - `search_flights(...)` wired through encoder + client + parser
+- `search_follow_up_flights(...)` wired through follow-up encoder + client +
+  parser
 - Tests for models, encoder behavior, parser behavior, payload fixture
   documentation, search API wiring, and public API exports
 
@@ -33,7 +34,6 @@ runtime API also does not yet expose the round-trip follow-up search step.
 
 - `get_booking_urls(...)`
 - `src/flights_search/booking/`
-- public follow-up search helper for round-trip selection flow
 
 ## Verification
 
@@ -58,13 +58,13 @@ Completed:
 
 - public model exports are in place
 - `search_flights(...)` executes the initial search runtime path
+- `search_follow_up_flights(...)` executes the round-trip return-options path
 - `build_booking_request(...)` returns a typed `BookingRequest`
 - `get_booking_url(...)` convenience wrapper exists
 
 Remaining:
 
 - `get_booking_urls(...)` runtime implementation
-- explicit public follow-up search API for round-trip outbound selection
 
 ### Models
 
@@ -135,9 +135,7 @@ Remaining:
 
 ## Recommended Next Steps
 
-1. Add a public follow-up round-trip helper that accepts the outbound
-   selection plus continuation handle and returns return-leg `SearchResults`.
-2. Validate the client/parser path against real captured HTML fixtures once a
+1. Validate the client/parser path against real captured HTML fixtures once a
    stable retrieval setup is available.
-3. Implement booking-link resolution only after the search and follow-up path
+2. Implement booking-link resolution only after the search and follow-up path
    is exposed end to end.

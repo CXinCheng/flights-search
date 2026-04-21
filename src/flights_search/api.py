@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from .client import fetch_search_html
-from .encoder import encode_search_request
-from .models import BookingRequest, FlightSearchRequest, SearchResults, SelectedItinerary
+from .encoder import encode_follow_up_request, encode_search_request
+from .models import (
+    BookingRequest,
+    ContinuationHandle,
+    FlightSearchRequest,
+    SearchResults,
+    SelectedItinerary,
+    SelectedLeg,
+)
 from .parser import parse_search_html
 
 
@@ -12,6 +19,23 @@ def search_flights(request: FlightSearchRequest) -> SearchResults:
     """Search Google Flights for the provided request.
     """
     encoded = encode_search_request(request)
+    html = fetch_search_html(encoded.params)
+    return parse_search_html(html)
+
+
+def search_follow_up_flights(
+    request: FlightSearchRequest,
+    *,
+    continuation: ContinuationHandle,
+    selected_outbound_leg: SelectedLeg,
+) -> SearchResults:
+    """Request round-trip return options after selecting an outbound leg."""
+
+    encoded = encode_follow_up_request(
+        request,
+        continuation=continuation,
+        selected_outbound_leg=selected_outbound_leg,
+    )
     html = fetch_search_html(encoded.params)
     return parse_search_html(html)
 

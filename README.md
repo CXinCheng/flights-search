@@ -33,5 +33,4 @@ The root package now includes the typed model layer, internal request
 encoding, a basic initial search runtime path, and parser coverage for the
 committed synthetic payload shapes.
 
-Booking URL resolution and the public round-trip follow-up runtime flow are
-still in progress.
+Booking URL resolution is still in progress.

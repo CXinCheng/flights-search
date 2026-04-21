@@ -4,14 +4,23 @@ import unittest
 
 import flights_search
 
-from flights_search.models import FlightSearchRequest, SelectedItinerary, SelectedLeg, SelectedSegment, TripLeg
+from flights_search.models import (
+    ContinuationHandle,
+    FlightSearchRequest,
+    SelectedItinerary,
+    SelectedLeg,
+    SelectedSegment,
+    TripLeg,
+)
 
 
 class PublicApiTests(unittest.TestCase):
     def test_top_level_exports_include_new_public_surface(self) -> None:
         self.assertTrue(hasattr(flights_search, "FlightSearchRequest"))
         self.assertTrue(hasattr(flights_search, "SelectedItinerary"))
+        self.assertTrue(hasattr(flights_search, "ContinuationHandle"))
         self.assertTrue(hasattr(flights_search, "search_flights"))
+        self.assertTrue(hasattr(flights_search, "search_follow_up_flights"))
         self.assertTrue(hasattr(flights_search, "build_booking_request"))
 
     def test_build_booking_request_returns_typed_request(self) -> None:
@@ -42,6 +51,10 @@ class PublicApiTests(unittest.TestCase):
 
     def test_search_flights_is_callable(self) -> None:
         self.assertTrue(callable(flights_search.search_flights))
+
+    def test_search_follow_up_flights_is_callable(self) -> None:
+        self.assertTrue(callable(flights_search.search_follow_up_flights))
+        self.assertIsInstance(ContinuationHandle("TOKEN-123"), ContinuationHandle)
 
 
 if __name__ == "__main__":
