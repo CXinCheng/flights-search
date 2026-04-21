@@ -1,0 +1,101 @@
+{
+  "description": "Synthetic follow-up payload for documenting parser offsets. Return-option rows live under payload[3][0], not payload[2][0].",
+  "flow": "round-trip follow-up search",
+  "rows_path": [3, 0],
+  "alliances_path": [7, 1, 0],
+  "airlines_path": [7, 1, 1],
+  "payload": [
+    null,
+    null,
+    [
+      []
+    ],
+    [
+      [
+        [
+          [
+            "best",
+            ["China Southern"],
+            [
+              [
+                null,
+                null,
+                null,
+                "SGN",
+                "Ho Chi Minh City",
+                "Guangzhou",
+                "CAN",
+                null,
+                [13, 15],
+                null,
+                [17, 40],
+                265,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "Boeing 737",
+                null,
+                null,
+                [2026, 4, 5],
+                [2026, 4, 5],
+                ["CZ", "456", null, "China Southern"]
+              ]
+            ],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            [
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              128000,
+              136000
+            ]
+          ],
+          [
+            [
+              null,
+              1100
+            ],
+            "TFU-RETURN-456"
+          ]
+        ]
+      ]
+    ],
+    null,
+    null,
+    null,
+    [
+      null,
+      [
+        [
+          ["SA", "Sample Alliance"]
+        ],
+        [
+          ["CZ", "China Southern"]
+        ]
+      ]
+    ]
+  ]
+}

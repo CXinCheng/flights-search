@@ -1,0 +1,177 @@
+{
+  "one_way_search": {
+    "description": "Initial one-way search request. This is the baseline case with no continuation token and no selected-flight injection.",
+    "request_model": {
+      "legs": [
+        {
+          "date": "2026-04-01",
+          "origin_airport": "CAN",
+          "destination_airport": "SGN"
+        }
+      ],
+      "trip_type": "one-way",
+      "passengers": {
+        "adults": 1,
+        "children": 0,
+        "infants_in_seat": 0,
+        "infants_on_lap": 0
+      },
+      "language": "en-US",
+      "currency": "SGD"
+    },
+    "expected_params": {
+      "curr": "SGD",
+      "hl": "en-US",
+      "tfs": "GhoSCjIwMjYtMDQtMDFqBRIDQ0FOcgUSA1NHTkABSAGYAQI="
+    }
+  },
+  "round_trip_follow_up": {
+    "description": "Round-trip follow-up request after selecting the outbound leg. This request includes a continuation token and injects the chosen outbound segments into the encoded request.",
+    "request_model": {
+      "legs": [
+        {
+          "date": "2026-04-01",
+          "origin_airport": "CAN",
+          "destination_airport": "SGN"
+        },
+        {
+          "date": "2026-04-05",
+          "origin_airport": "SGN",
+          "destination_airport": "CAN"
+        }
+      ],
+      "trip_type": "round-trip",
+      "passengers": {
+        "adults": 1,
+        "children": 0,
+        "infants_in_seat": 0,
+        "infants_on_lap": 0
+      },
+      "language": "en-US",
+      "currency": "SGD"
+    },
+    "selected_outbound_leg": {
+      "segments": [
+        {
+          "origin_airport": "CAN",
+          "date": "2026-04-01",
+          "destination_airport": "SZX",
+          "marketing_airline_code": "CZ",
+          "flight_number": "123"
+        },
+        {
+          "origin_airport": "SZX",
+          "date": "2026-04-01",
+          "destination_airport": "SGN",
+          "marketing_airline_code": "CZ",
+          "flight_number": "456"
+        }
+      ]
+    },
+    "continuation_handle": "TOKEN-123",
+    "expected_params": {
+      "curr": "SGD",
+      "hl": "en-US",
+      "tfs": "GlwSCjIwMjYtMDQtMDFqBRIDQ0FOcgUSA1NHTiIfCgNDQU4SCjIwMjYtMDQtMDEaA1NaWCoCQ1oyAzEyMyIfCgNTWlgSCjIwMjYtMDQtMDEaA1NHTioCQ1oyAzQ1NhoaEgoyMDI2LTA0LTA1agUSA1NHTnIFEgNDQU5AAUgBmAEB",
+      "tfu": "TOKEN-123"
+    }
+  },
+  "one_way_booking": {
+    "description": "Final booking request for a one-way itinerary. This request injects the selected outbound leg into `tfs` and does not include `tfu` in the booking params.",
+    "request_model": {
+      "legs": [
+        {
+          "date": "2026-04-01",
+          "origin_airport": "CAN",
+          "destination_airport": "SGN"
+        }
+      ],
+      "trip_type": "one-way",
+      "passengers": {
+        "adults": 1,
+        "children": 0,
+        "infants_in_seat": 0,
+        "infants_on_lap": 0
+      },
+      "language": "en-US",
+      "currency": "SGD"
+    },
+    "selected_itinerary": {
+      "legs": [
+        {
+          "segments": [
+            {
+              "origin_airport": "CAN",
+              "date": "2026-04-01",
+              "destination_airport": "SGN",
+              "marketing_airline_code": "9C",
+              "flight_number": "7347"
+            }
+          ]
+        }
+      ]
+    },
+    "expected_params": {
+      "curr": "SGD",
+      "hl": "en-US",
+      "tfs": "GjwSCjIwMjYtMDQtMDFqBRIDQ0FOcgUSA1NHTiIgCgNDQU4SCjIwMjYtMDQtMDEaA1NHTioCOUMyBDczNDdAAUgBmAEC"
+    }
+  },
+  "round_trip_booking": {
+    "description": "Final booking request for a round-trip itinerary. This request injects both selected legs into `tfs` and intentionally omits `tfu` from the booking params.",
+    "request_model": {
+      "legs": [
+        {
+          "date": "2026-04-01",
+          "origin_airport": "CAN",
+          "destination_airport": "SGN"
+        },
+        {
+          "date": "2026-04-05",
+          "origin_airport": "SGN",
+          "destination_airport": "CAN"
+        }
+      ],
+      "trip_type": "round-trip",
+      "passengers": {
+        "adults": 1,
+        "children": 0,
+        "infants_in_seat": 0,
+        "infants_on_lap": 0
+      },
+      "language": "en-US",
+      "currency": "SGD"
+    },
+    "selected_itinerary": {
+      "legs": [
+        {
+          "segments": [
+            {
+              "origin_airport": "CAN",
+              "date": "2026-04-01",
+              "destination_airport": "SGN",
+              "marketing_airline_code": "9C",
+              "flight_number": "7347"
+            }
+          ]
+        },
+        {
+          "segments": [
+            {
+              "origin_airport": "SGN",
+              "date": "2026-04-05",
+              "destination_airport": "CAN",
+              "marketing_airline_code": "9C",
+              "flight_number": "7348"
+            }
+          ]
+        }
+      ]
+    },
+    "expected_params": {
+      "curr": "SGD",
+      "hl": "en-US",
+      "tfs": "GjwSCjIwMjYtMDQtMDFqBRIDQ0FOcgUSA1NHTiIgCgNDQU4SCjIwMjYtMDQtMDEaA1NHTioCOUMyBDczNDcaPBIKMjAyNi0wNC0wNWoFEgNTR05yBRIDQ0FOIiAKA1NHThIKMjAyNi0wNC0wNRoDQ0FOKgI5QzIENzM0OEABSAGYAQE="
+    }
+  }
+}

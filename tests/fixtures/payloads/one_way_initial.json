@@ -1,0 +1,101 @@
+{
+  "description": "Synthetic initial search payload for documenting parser offsets. Initial result rows live under payload[2][0].",
+  "flow": "one-way initial search",
+  "rows_path": [2, 0],
+  "alliances_path": [7, 1, 0],
+  "airlines_path": [7, 1, 1],
+  "payload": [
+    null,
+    null,
+    [
+      [
+        [
+          [
+            "best",
+            ["Spring"],
+            [
+              [
+                null,
+                null,
+                null,
+                "CAN",
+                "Guangzhou",
+                "Ho Chi Minh City",
+                "SGN",
+                null,
+                [8, 30],
+                null,
+                [10, 50],
+                140,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "Airbus A320",
+                null,
+                null,
+                [2026, 4, 1],
+                [2026, 4, 1],
+                ["9C", "7347", null, "Spring"]
+              ]
+            ],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            [
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              135000,
+              140000
+            ]
+          ],
+          [
+            [
+              null,
+              900
+            ],
+            "TFU-ONE-WAY-123"
+          ]
+        ]
+      ]
+    ],
+    [
+      []
+    ],
+    null,
+    null,
+    null,
+    [
+      null,
+      [
+        [
+          ["ST", "Sample Alliance"]
+        ],
+        [
+          ["9C", "Spring"]
+        ]
+      ]
+    ]
+  ]
+}

@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+
+# Editors and local workspace settings
+.idea/
+.vscode/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.basedpyright/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build and packaging artifacts
+build/
+dist/
+site/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test, coverage, and runtime outputs
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Pixi / local environment state
+.pixi/
+pixi.lock
+
+# Playwright browser downloads and artifacts
+playwright-report/
+test-results/
+
