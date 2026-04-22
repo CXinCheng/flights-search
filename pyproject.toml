@@ -13,10 +13,14 @@ authors = [
 ]
 dependencies = [
   "httpx>=0.28.1",
+  "mcp>=1.14.1",
   "playwright>=1.52.0",
   "protobuf>=6.31.1",
   "selectolax>=0.3.28",
 ]
+
+[project.scripts]
+flights-search-mcp = "flights_search_mcp.server:main"
 
 [tool.setuptools.package-dir]
 "" = "src"
