@@ -1,10 +1,11 @@
-"""HTTP retrieval helpers for Google Flights search pages."""
+"""HTTP retrieval helpers for Google Flights search and booking pages."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 DEFAULT_SEARCH_URL = "https://www.google.com/travel/flights/search"
+DEFAULT_BOOKING_URL = "https://www.google.com/travel/flights/booking"
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -15,7 +16,7 @@ DEFAULT_USER_AGENT = (
 
 @dataclass(frozen=True)
 class SearchHttpClient:
-    """Minimal HTTP client for retrieving Google Flights search HTML."""
+    """Minimal HTTP client for retrieving Google Flights pages."""
 
     timeout: float = DEFAULT_TIMEOUT_SECONDS
     headers: dict[str, str] = field(
@@ -34,6 +35,16 @@ class SearchHttpClient:
     def fetch_search_html(self, params: dict[str, str]) -> str:
         """Fetch Google Flights search HTML for the encoded params."""
 
+        return self._fetch_html(DEFAULT_SEARCH_URL, params)
+
+    def fetch_booking_html(self, params: dict[str, str]) -> str:
+        """Fetch Google Flights booking HTML for the encoded params."""
+
+        return self._fetch_html(DEFAULT_BOOKING_URL, params)
+
+    def _fetch_html(self, url: str, params: dict[str, str]) -> str:
+        """Fetch a Google Flights HTML page for the encoded params."""
+
         import httpx
 
         with httpx.Client(
@@ -41,7 +52,7 @@ class SearchHttpClient:
             timeout=self.timeout,
             follow_redirects=True,
         ) as client:
-            response = client.get(DEFAULT_SEARCH_URL, params=params)
+            response = client.get(url, params=params)
             response.raise_for_status()
             return response.text
 
@@ -50,3 +61,9 @@ def fetch_search_html(params: dict[str, str]) -> str:
     """Fetch Google Flights search HTML using the default client settings."""
 
     return SearchHttpClient().fetch_search_html(params)
+
+
+def fetch_booking_html(params: dict[str, str]) -> str:
+    """Fetch Google Flights booking HTML using the default client settings."""
+
+    return SearchHttpClient().fetch_booking_html(params)

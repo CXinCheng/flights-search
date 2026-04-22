@@ -8,7 +8,9 @@ The root `flights_search` package has an implemented typed model layer, a
 working request encoder, a basic HTTP client, HTML/payload parser support,
 top-level API exports, and test coverage for those pieces.
 
-The runtime booking-resolution subsystem is still not implemented.
+The runtime booking-resolution subsystem now uses a Playwright-driven
+booking-results capture flow because the booking page HTML shell does not
+reliably expose booking links by itself.
 
 ## Current Repo Status
 
@@ -32,8 +34,8 @@ The runtime booking-resolution subsystem is still not implemented.
 
 ### Present but not implemented
 
-- `get_booking_urls(...)`
-- `src/flights_search/booking/`
+- committed live booking fixtures
+- broader validation across more routes and round-trip selections
 
 ## Verification
 
@@ -45,7 +47,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 Result:
 
-- 25 tests ran
+- 32 tests ran
 - all tests passed
 
 ## Status By Area
@@ -60,11 +62,12 @@ Completed:
 - `search_flights(...)` executes the initial search runtime path
 - `search_follow_up_flights(...)` executes the round-trip return-options path
 - `build_booking_request(...)` returns a typed `BookingRequest`
-- `get_booking_url(...)` convenience wrapper exists
+- `get_booking_urls(...)` executes the booking runtime path
+- `get_booking_url(...)` resolves the first candidate at runtime
 
 Remaining:
 
-- `get_booking_urls(...)` runtime implementation
+- validate booking retrieval against stable live responses
 
 ### Models
 
@@ -125,17 +128,27 @@ Remaining:
 
 ### Booking
 
-Status: not started
+Status: implemented first Playwright-backed slice
+
+Completed:
+
+- live validation that the booking page HTML shell does not expose booking
+  links directly
+- Playwright capture of `GetBookingResults` payloads from the booking page
+- booking-link extraction from direct, structured, and line-framed response
+  text
+- booking API tests for runtime resolution and empty-result behavior
 
 Remaining:
 
-- implement booking-link retrieval for selected itineraries
-- choose HTTP-first versus browser-assisted extraction behavior
-- add booking-specific tests and fixtures
+- validate extraction against more stable live booking responses
+- decide whether we need committed sanitized booking payload fixtures in
+  addition to unit-level synthetic coverage
+- add committed live booking fixtures once stable captures are available
 
 ## Recommended Next Steps
 
 1. Validate the client/parser path against real captured HTML fixtures once a
    stable retrieval setup is available.
-2. Implement booking-link resolution only after the search and follow-up path
-   is exposed end to end.
+2. Capture and sanitize representative live booking payload fixtures so the
+   Playwright-backed flow has regression coverage against real responses.

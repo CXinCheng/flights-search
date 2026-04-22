@@ -13,6 +13,7 @@ authors = [
 ]
 dependencies = [
   "httpx>=0.28.1",
+  "playwright>=1.52.0",
   "protobuf>=6.31.1",
   "selectolax>=0.3.28",
 ]
@@ -44,13 +45,10 @@ basedpyright = ">=1.29.1"
 pytest = ">=8.3.5"
 ruff = ">=0.11.7"
 
-[tool.pixi.feature.local.pypi-dependencies]
-playwright = ">=1.52.0"
-
 [tool.pixi.environments]
 default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
-local = { features = ["dev", "local"], solve-group = "default" }
+local = { features = ["dev"], solve-group = "default" }
 
 [tool.pixi.tasks]
 test = "PYTHONPATH=src python -m unittest discover -s tests"

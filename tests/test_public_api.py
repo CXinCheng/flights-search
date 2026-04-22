@@ -22,6 +22,8 @@ class PublicApiTests(unittest.TestCase):
         self.assertTrue(hasattr(flights_search, "search_flights"))
         self.assertTrue(hasattr(flights_search, "search_follow_up_flights"))
         self.assertTrue(hasattr(flights_search, "build_booking_request"))
+        self.assertTrue(hasattr(flights_search, "get_booking_urls"))
+        self.assertTrue(hasattr(flights_search, "get_booking_url"))
 
     def test_build_booking_request_returns_typed_request(self) -> None:
         request = FlightSearchRequest(
@@ -55,6 +57,10 @@ class PublicApiTests(unittest.TestCase):
     def test_search_follow_up_flights_is_callable(self) -> None:
         self.assertTrue(callable(flights_search.search_follow_up_flights))
         self.assertIsInstance(ContinuationHandle("TOKEN-123"), ContinuationHandle)
+
+    def test_booking_helpers_are_callable(self) -> None:
+        self.assertTrue(callable(flights_search.get_booking_urls))
+        self.assertTrue(callable(flights_search.get_booking_url))
 
 
 if __name__ == "__main__":

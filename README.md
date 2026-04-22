@@ -30,7 +30,10 @@ Planned tasks:
 - `pixi run docs-check`
 
 The root package now includes the typed model layer, internal request
-encoding, a basic initial search runtime path, and parser coverage for the
-committed synthetic payload shapes.
+encoding, the initial and follow-up search runtime paths, and a
+Playwright-backed booking-resolution flow for explicit selected itineraries.
 
-Booking URL resolution is still in progress.
+Booking resolution needs the Playwright Chromium browser binary in addition to
+the Python dependency. After installing dependencies, run
+`python -m playwright install chromium` before calling `get_booking_urls(...)`
+or `get_booking_url(...)`.

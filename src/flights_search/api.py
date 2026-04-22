@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from .booking import resolve_booking_urls
 from .client import fetch_search_html
-from .encoder import encode_follow_up_request, encode_search_request
+from .encoder import (
+    encode_booking_request,
+    encode_follow_up_request,
+    encode_search_request,
+)
 from .models import (
     BookingRequest,
     ContinuationHandle,
@@ -49,14 +54,10 @@ def build_booking_request(
 
 
 def get_booking_urls(request: BookingRequest) -> list[str]:
-    """Resolve booking URL candidates for a selected itinerary.
+    """Resolve booking URL candidates for a selected itinerary."""
 
-    Booking resolution is intentionally deferred to a later subsystem slice.
-    """
-
-    raise NotImplementedError(
-        "get_booking_urls() will be implemented in the booking subsystem slice."
-    )
+    encoded = encode_booking_request(request)
+    return resolve_booking_urls(encoded.params)
 
 
 def get_booking_url(request: BookingRequest) -> str | None:
