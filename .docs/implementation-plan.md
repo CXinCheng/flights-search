@@ -2,8 +2,10 @@
 
 ## Purpose
 
-This document is the forward-looking roadmap for the greenfield
-`flights_search` package. For current repo status, use
+This document now records the closeout plan for the greenfield
+`flights_search` package. The main feature surface is implemented; the
+remaining work is live validation, documentation cleanup, and ending active
+feature development. For current repo status, use
 `.docs/implementation-progress.md`.
 
 ## Scope
@@ -28,79 +30,79 @@ research, but it is not a compatibility target.
 - representative fixtures and automated tests
 - focused docs for architecture, plan, and current progress
 
-## Working Sequence
+## Current Position
 
-### Phase 1. Finish the runtime search path
+The planned major features are implemented:
+
+- structured search request encoding
+- initial search result parsing
+- round-trip follow-up search flow
+- selected-itinerary booking request generation
+- booking URL resolution through the explicit booking API
+- automated unit coverage for the implemented runtime slices
+
+The project should not keep expanding the feature surface unless live testing
+reveals a concrete gap that blocks the intended product capability.
+
+## Closeout Sequence
+
+### Phase 1. Run live validation
 
 Goal:
-Turn the existing model and encoder foundation into a working search flow.
+Verify that the implemented runtime slices still behave correctly against real
+Google Flights responses.
 
 Tasks:
 
-- implement the client contract for Google Flights HTML retrieval
-- define headers, timeout defaults, retries, and cookie behavior
-- add retrieval fixtures or fixture-capture guidance if needed
-- implement parser support for initial search results
-- wire `search_flights(...)` to encoder + client + parser
+- run live one-way search validation on representative routes
+- run live round-trip follow-up validation after selecting outbound options
+- run live booking resolution validation for selected itineraries
+- note any response-shape mismatches, anti-bot issues, or environment
+  prerequisites such as Playwright browser installation
 
 Exit criteria:
 
-- a structured one-way search request can produce typed `SearchResults`
-- tests cover the initial search flow end to end with fixtures
+- the core search and booking flows are exercised against live responses
+- any issues found are classified as blockers, minor fixes, or acceptable
+  operational constraints
 
-### Phase 2. Finish round-trip follow-up search
+### Phase 2. Capture evidence for regression protection
 
 Goal:
-Support the two-stage selection flow required for round-trip behavior.
+Preserve enough real-world evidence to support the current implementation
+without reopening broad feature development.
 
 Tasks:
 
-- implement parser support for follow-up payloads
-- preserve continuation state in typed results
-- support follow-up client retrieval from selected outbound legs
-- verify the `encode_follow_up_request(...)` contract against parser inputs
+- capture sanitized live HTML and booking-result payload samples when stable
+- confirm whether existing synthetic fixtures are sufficient once compared
+  against live payloads
+- add only the minimum extra fixture coverage needed for confidence
 
 Exit criteria:
 
-- an initial round-trip search can return outbound options
-- an outbound selection can drive a follow-up request for return options
-- tests cover the follow-up flow with committed fixtures
+- live behavior has been compared against the current parser and booking logic
+- fixture coverage is good enough to protect the implemented feature set
 
-### Phase 3. Implement booking resolution
+### Phase 3. Update docs and stop active development
 
 Goal:
-Resolve booking links for a selected itinerary without coupling booking lookup
-to the search API.
+Reflect that the package has reached implementation completion for the intended
+scope and move the repo into maintenance mode.
 
 Tasks:
 
-- implement `get_booking_urls(...)`
-- decide on HTTP-first extraction versus browser-assisted fallback
-- keep any browser automation isolated inside `booking/`
-- add fixtures and tests for one-way and round-trip booking flows
+- update `.docs/implementation-progress.md` after live testing
+- trim this plan so it no longer reads like an open feature roadmap
+- update `.docs/README.md` to point readers to status and maintenance guidance
+- make any final README usage or environment notes that live testing proves
+  necessary
 
 Exit criteria:
 
-- callers can convert a `FlightSearchRequest` plus `SelectedItinerary` into
-  booking URL candidates through the explicit booking API
-
-### Phase 4. Tighten tooling and docs
-
-Goal:
-Keep tooling and docs aligned with the active implementation.
-
-Tasks:
-
-- align `pixi` tasks with the available Python executable in managed and local
-  environments
-- expand README usage examples once runtime search works
-- keep `.docs/implementation-progress.md` current as subsystems land
-- trim or reorganize docs if implementation creates new ambiguity
-
-Exit criteria:
-
-- developer tasks run consistently
-- docs clearly separate architecture, plan, and status
+- docs clearly state that the major feature work is complete
+- remaining work is framed as validation and maintenance, not new feature
+  delivery
 
 ## Constraints
 
@@ -119,3 +121,4 @@ Exit criteria:
 - compatibility shims for the legacy package API
 - airport-search helpers and generated airport assets
 - debug-heavy runtime capture utilities outside the booking subsystem
+- additional feature expansion beyond the current search and booking scope
