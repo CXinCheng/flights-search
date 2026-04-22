@@ -2,10 +2,10 @@
 
 ## Purpose
 
-This document now records the closeout plan for the greenfield
-`flights_search` package. The main feature surface is implemented; the
-remaining work is live validation, documentation cleanup, and ending active
-feature development. For current repo status, use
+This document records the remaining closeout checklist for the greenfield
+`flights_search` package. The main feature surface is already implemented and
+the project should be treated as feature-complete for its intended scope unless
+live validation exposes a concrete blocking gap. For current repo status, use
 `.docs/implementation-progress.md`.
 
 ## Scope
@@ -18,7 +18,7 @@ The package is being built around two product capabilities only:
 The `legacy/` tree can still be used for behavior discovery and fixture
 research, but it is not a compatibility target.
 
-## Target Deliverables
+## Delivered Surface
 
 - root package at `src/flights_search/`
 - stable public typed API
@@ -42,11 +42,12 @@ The planned major features are implemented:
 - automated unit coverage for the implemented runtime slices
 
 The project should not keep expanding the feature surface unless live testing
-reveals a concrete gap that blocks the intended product capability.
+reveals a concrete gap that blocks one of the two intended product
+capabilities.
 
-## Closeout Sequence
+## Remaining Closeout Work
 
-### Phase 1. Run live validation
+### 1. Extend live validation slightly
 
 Goal:
 Verify that the implemented runtime slices still behave correctly against real
@@ -66,7 +67,7 @@ Exit criteria:
 - any issues found are classified as blockers, minor fixes, or acceptable
   operational constraints
 
-### Phase 2. Capture evidence for regression protection
+### 2. Capture minimum regression evidence
 
 Goal:
 Preserve enough real-world evidence to support the current implementation
@@ -84,7 +85,7 @@ Exit criteria:
 - live behavior has been compared against the current parser and booking logic
 - fixture coverage is good enough to protect the implemented feature set
 
-### Phase 3. Update docs and stop active development
+### 3. Keep docs in maintenance mode
 
 Goal:
 Reflect that the package has reached implementation completion for the intended
@@ -103,6 +104,12 @@ Exit criteria:
 - docs clearly state that the major feature work is complete
 - remaining work is framed as validation and maintenance, not new feature
   delivery
+
+## Completion Signal
+
+Once the remaining validation is judged sufficient, this repo should be treated
+as complete for the current scope and maintained through targeted fixes rather
+than new feature expansion.
 
 ## Constraints
 
