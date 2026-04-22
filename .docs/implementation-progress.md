@@ -2,10 +2,11 @@
 
 ## Snapshot
 
-Last reviewed: 2026-04-21
+Last reviewed: 2026-04-22
 
 The root `flights_search` package has an implemented typed model layer, a
-working request encoder, a basic HTTP client, HTML/payload parser support,
+working request encoder, a retrying HTTP client with cookie persistence,
+HTML/payload parser support,
 top-level API exports, and test coverage for those pieces.
 
 The runtime booking-resolution subsystem now uses a Playwright-driven
@@ -25,6 +26,7 @@ reliably expose booking links by itself.
 - Follow-up request encoding with continuation support
 - Booking request encoding for explicit selected itineraries
 - HTTP retrieval helper in `src/flights_search/client/`
+- transient HTTP retry handling and per-client cookie persistence
 - HTML and payload parsing in `src/flights_search/parser/`
 - `search_flights(...)` wired through encoder + client + parser
 - `search_follow_up_flights(...)` wired through follow-up encoder + client +
@@ -39,7 +41,7 @@ reliably expose booking links by itself.
 
 ## Verification
 
-Current test command run on 2026-04-21:
+Current test command run on 2026-04-22:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
@@ -47,7 +49,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 Result:
 
-- 32 tests ran
+- 42 tests ran
 - all tests passed
 
 ## Status By Area
@@ -106,12 +108,16 @@ Remaining:
 
 ### Client
 
-Status: implemented first slice
+Status: implemented hardened first slice
+
+Completed:
+
+- shared default headers and timeout defaults
+- transient retry handling for retryable status codes and request failures
+- per-client cookie persistence across successive retrievals
 
 Remaining:
 
-- decide whether to add retries and cookie persistence on top of the current
-  `httpx` retrieval helper
 - validate the current headers and timeout choices against stable live
   retrieval behavior once environment access is available
 
