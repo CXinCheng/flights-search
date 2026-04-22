@@ -86,6 +86,22 @@ class ParserTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_search_html("<html><body>No payload here.</body></html>")
 
+    def test_parse_payload_accepts_hour_only_time_values(self) -> None:
+        payload = _load_payload("one_way_initial")
+        payload[2][0][0][0][2][0][8] = [22]
+
+        results = parse_search_payload(payload)
+
+        self.assertEqual(results.options[0].segments[0].departure_time, "22:00")
+
+    def test_parse_payload_accepts_null_hour_midnight_values(self) -> None:
+        payload = _load_payload("one_way_initial")
+        payload[2][0][0][0][2][0][8] = [None, 55]
+
+        results = parse_search_payload(payload)
+
+        self.assertEqual(results.options[0].segments[0].departure_time, "00:55")
+
 
 if __name__ == "__main__":
     unittest.main()

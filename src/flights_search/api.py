@@ -42,7 +42,8 @@ def search_follow_up_flights(
         selected_outbound_leg=selected_outbound_leg,
     )
     html = fetch_search_html(encoded.params)
-    return parse_search_html(html)
+    parsed = parse_search_html(html)
+    return SearchResults(options=parsed.options, selection_phase="follow-up")
 
 
 def build_booking_request(

@@ -181,9 +181,21 @@ def _parse_carbon_data(extras: Any) -> CarbonData | None:
 
 
 def _format_clock_time(value: list[Any]) -> str:
-    if len(value) < 2 or not all(isinstance(part, int) for part in value[:2]):
-        raise ValueError("Expected Google Flights time value to contain hour and minute.")
-    hour, minute = value[0], value[1]
+    if not value:
+        raise ValueError("Expected Google Flights time value to contain time parts.")
+
+    raw_hour = value[0]
+    raw_minute = value[1] if len(value) >= 2 else None
+
+    if raw_hour is None and isinstance(raw_minute, int):
+        hour = 0
+        minute = raw_minute
+    elif isinstance(raw_hour, int):
+        hour = raw_hour
+        minute = raw_minute if isinstance(raw_minute, int) else 0
+    else:
+        raise ValueError("Expected Google Flights time value to contain an hour.")
+
     return f"{hour:02d}:{minute:02d}"
 
 

@@ -9,6 +9,7 @@ from flights_search import search_flights, search_follow_up_flights
 from flights_search.models import (
     ContinuationHandle,
     FlightSearchRequest,
+    SearchResults,
     SelectedLeg,
     SelectedSegment,
     TripLeg,
@@ -101,6 +102,46 @@ class SearchFlightsApiTests(unittest.TestCase):
         self.assertEqual(fetch_params["curr"], "SGD")
         self.assertEqual(fetch_params["tfu"], "TOKEN-123")
         self.assertIn("tfs", fetch_params)
+
+    @patch("flights_search.api.parse_search_html")
+    @patch("flights_search.api.fetch_search_html")
+    def test_search_follow_up_flights_forces_follow_up_phase_when_parser_is_ambiguous(
+        self, mock_fetch_search_html, mock_parse_search_html
+    ) -> None:
+        request = FlightSearchRequest(
+            legs=(
+                TripLeg("2026-04-01", "CAN", "SGN"),
+                TripLeg("2026-04-05", "SGN", "CAN"),
+            ),
+            trip_type="round-trip",
+            language="en-US",
+            currency="SGD",
+        )
+        selected_outbound_leg = SelectedLeg(
+            segments=(
+                SelectedSegment(
+                    origin_airport="CAN",
+                    date="2026-04-01",
+                    destination_airport="SGN",
+                    marketing_airline_code="CZ",
+                    flight_number="123",
+                ),
+            )
+        )
+        mock_fetch_search_html.return_value = "<html></html>"
+        mock_parse_search_html.return_value = SearchResults(
+            options=(),
+            selection_phase="initial",
+        )
+
+        results = search_follow_up_flights(
+            request,
+            continuation=ContinuationHandle("TOKEN-123"),
+            selected_outbound_leg=selected_outbound_leg,
+        )
+
+        self.assertEqual(results.selection_phase, "follow-up")
+        self.assertEqual(results.options, ())
 
 
 if __name__ == "__main__":

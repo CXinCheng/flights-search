@@ -16,11 +16,14 @@ runtime slice for the full planned surface:
 - Playwright-backed booking-result capture plus booking-link extraction
 - top-level API helpers and public exports
 - committed synthetic fixtures and unit tests for the implemented flows
+- initial live validation for one-way search, round-trip follow-up search,
+  and booking URL resolution
 
 The major feature work is complete for the intended project scope. The main
-remaining gap is live validation against stable real Google Flights responses.
-The repo is well-covered at the unit level, but it does not yet include
-committed live HTML or booking payload captures.
+remaining gaps are broader live coverage across more route shapes plus any
+minimum sanitized fixture capture we decide to commit from those runs. The repo
+is well-covered at the unit level, and the primary live path has now been
+exercised against real Google Flights responses.
 
 ## Current Repo Status
 
@@ -48,6 +51,17 @@ committed live HTML or booking payload captures.
 - automated test coverage for models, encoder behavior, parser behavior,
   client retries/cookies, booking extraction/runtime errors, API wiring, and
   public exports
+- live validation completed for:
+  - one-way `search_flights(...)` on `SIN -> HND`
+  - round-trip `search_flights(...)` plus `search_follow_up_flights(...)` on
+    `SIN -> HND -> SIN`
+  - one-way `get_booking_urls(...)` on a live selected itinerary
+- parser hardening for live Google Flights time shapes:
+  - `[hour]` now parses as `HH:00`
+  - `[null, minute]` now parses as `00:MM`
+- follow-up API responses are now forced to report
+  `selection_phase="follow-up"` at the API boundary, rather than depending on
+  unstable live payload row placement alone
 
 ### Not Yet Implemented
 
@@ -67,8 +81,16 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 Result:
 
-- 42 tests ran
+- 45 tests ran
 - all tests passed
+
+Live validation run on 2026-04-22:
+
+- one-way live search returned parsed options and continuation handles
+- round-trip live initial search and return-option follow-up both completed
+- live booking resolution returned booking URL candidates
+- live payloads exposed additional time encodings not covered by the original
+  synthetic fixtures
 
 ## Status By Area
 
@@ -87,8 +109,9 @@ Completed:
 
 Remaining:
 
-- validate the API flows against stable live responses rather than only
-  synthetic fixtures and mocked runtime boundaries
+- expand live validation beyond the representative routes already exercised
+- decide whether to commit any sanitized live fixtures for long-term regression
+  coverage
 
 ### Models
 
@@ -123,7 +146,7 @@ Completed:
 Remaining:
 
 - validate encoded params against live retrieval behavior once stable runtime
-  captures are available
+  captures are available for more route and airline combinations
 
 ### Client
 
@@ -151,11 +174,12 @@ Completed:
 - payload parsing for both initial and follow-up result shapes
 - typed option, segment, carbon, and continuation extraction
 - committed synthetic payload fixtures for both selection phases
+- live-parser hardening for time values shaped like `[22]` and `[null, 55]`
 
 Remaining:
 
 - expand validation beyond the committed synthetic payload shapes
-- validate parser behavior against stable live HTML fixtures
+- decide whether to commit stable sanitized live HTML fixtures
 
 ### Booking
 
@@ -171,6 +195,8 @@ Completed:
 - runtime error messaging for missing Playwright runtime or missing Chromium
   browser binaries
 - booking API tests for runtime resolution and empty-result behavior
+- live booking resolution produced booking URL candidates for a selected
+  one-way itinerary
 
 Remaining:
 
@@ -180,9 +206,9 @@ Remaining:
 
 ## Recommended Next Steps
 
-1. Start live testing for the implemented one-way, round-trip, and booking
-   flows instead of building additional features.
-2. Capture only the minimum sanitized live fixtures needed to confirm parser
+1. Capture only the minimum sanitized live fixtures needed to confirm parser
    and booking behavior against real responses.
-3. After live testing, do a final documentation pass and treat the project as
+2. Run a slightly broader live matrix covering more airlines, stops, and
+   multi-segment itineraries.
+3. After that, do a final documentation pass and treat the project as
    feature-complete for the current scope.
